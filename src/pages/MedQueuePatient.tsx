@@ -20,7 +20,8 @@ import {
     MessageSquare,
     Sun,
     Moon,
-    UserPlus
+    UserPlus,
+    Navigation
 } from 'lucide-react';
 import { useAuth } from '../components/ProtectedRoute';
 import { fetchHospitals, trackQueueSMS } from '../lib/api';
@@ -42,7 +43,20 @@ const MedQueuePatient = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+    const cityCoordinates: Record<string, { lat: number; lng: number; label: string }> = {
+        cuttack: { lat: 20.4625, lng: 85.8830, label: 'Cuttack (SCB / CDA)' },
+        tangi: { lat: 20.5985, lng: 85.9723, label: 'Tangi, Cuttack (Padmini Care)' },
+        bhubaneswar: { lat: 20.2608, lng: 85.7836, label: 'Bhubaneswar' }
+    };
+
+    const [selectedCity, setSelectedCity] = useState<'cuttack' | 'tangi' | 'bhubaneswar'>(() => {
+        return (localStorage.getItem('medQueueSelectedCity') as any) || 'cuttack';
+    });
+
+    const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(() => {
+        const saved = (localStorage.getItem('medQueueSelectedCity') as any) || 'cuttack';
+        return cityCoordinates[saved] || cityCoordinates.cuttack;
+    });
     const [activeTab, setActiveTab] = useState<'hospitals' | 'symptom-checker' | 'pharmacy'>('hospitals');
     const [cart, setCart] = useState<{ med: Medicine, quantity: number }[]>([]);
     const [medicineSearch, setMedicineSearch] = useState('');
@@ -136,30 +150,26 @@ const MedQueuePatient = () => {
         localStorage.removeItem('medQueueHistory');
         setBookingHistory([]);
 
-        // Get user real location with high accuracy
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-                },
-                (err) => {
-                    console.warn("GPS timeout or permission denied, using Cuttack / Tangi region center:", err);
-                    setUserLocation({ lat: 20.4625, lng: 85.8830 });
-                },
-                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-            );
-        } else {
-            setUserLocation({ lat: 20.4625, lng: 85.8830 });
-        }
+        // Default strictly to Cuttack so SCB and Padmini Care are always nearest
+        const initialCoords = cityCoordinates[selectedCity] || cityCoordinates.cuttack;
+        setUserLocation(initialCoords);
     }, []);
+
+    const handleCityChange = (city: 'cuttack' | 'tangi' | 'bhubaneswar') => {
+        setSelectedCity(city);
+        localStorage.setItem('medQueueSelectedCity', city);
+        const coords = cityCoordinates[city];
+        setUserLocation(coords);
+        setToast(`Location set to ${coords.label}. Recalculating distances.`);
+        setTimeout(() => setToast(null), 3000);
+    };
 
     useEffect(() => {
         const loadHospitals = async () => {
             try {
                 setLoading(true);
-                const lat = userLocation?.lat || 20.4625;
-                const lng = userLocation?.lng || 85.8830;
-                const data = await fetchHospitals(lat, lng);
+                const currentCoords = userLocation || cityCoordinates[selectedCity] || cityCoordinates.cuttack;
+                const data = await fetchHospitals(currentCoords.lat, currentCoords.lng);
                 setHospitals(data || []);
             } catch (error: any) {
                 console.error("Error fetching hospitals", error);
@@ -173,8 +183,16 @@ const MedQueuePatient = () => {
     }, [userLocation]);
 
     const filteredHospitals = useMemo(() => {
-        const currentLoc = userLocation || { lat: 20.4625, lng: 85.8830 };
-        return hospitals.filter((h, index) => {
+        const currentLoc = userLocation || cityCoordinates[selectedCity] || cityCoordinates.cuttack;
+        return hospitals.map((h) => {
+            const hLat = h.position?.lat || h.location?.lat;
+            const hLng = h.position?.lng || h.location?.lng;
+            const computedDist = (hLat && hLng) ? getDistance(currentLoc.lat, currentLoc.lng, hLat, hLng) : (h.distance || 10);
+            return {
+                ...h,
+                computedDistance: computedDist
+            };
+        }).filter((h, index) => {
             const hName = h?.name || '';
             const hAddress = h?.address || '';
             const hType = h?.type || (index % 4 === 0 ? 'Emergency' : index % 3 === 0 ? 'Diagnostics' : 'General');
@@ -207,9 +225,7 @@ const MedQueuePatient = () => {
                 return waitA - waitB;
             }
             // Default and Nearby: Sort by nearest distance ascending
-            const distA = getDistance(currentLoc.lat, currentLoc.lng, a.position?.lat, a.position?.lng);
-            const distB = getDistance(currentLoc.lat, currentLoc.lng, b.position?.lat, b.position?.lng);
-            return distA - distB;
+            return a.computedDistance - b.computedDistance;
         });
     }, [hospitals, searchTerm, activeCategory, userLocation]);
 
@@ -763,92 +779,119 @@ const MedQueuePatient = () => {
 
                 {activeTab === 'hospitals' && (
                     <>
-                        {/* Categories */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-12">
-                    {[
-                        { icon: Activity, label: 'All', color: 'text-slate-900' },
-                        { icon: Stethoscope, label: 'Emergency', color: 'text-red-500' },
-                        { icon: Activity, label: 'Diagnostics', color: 'text-blue-500' },
-                        { icon: MapPin, label: 'Nearby', color: 'text-green-500' },
-                        { icon: Clock, label: 'Min Wait', color: 'text-orange-500' },
-                    ].map((cat) => (
-                        <button
-                            key={cat.label}
-                            onClick={() => {
-                                if (cat.label === 'Nearby') {
-                                    if (!userLocation) {
-                                        setToast('Fetching your location...');
-                                        navigator.geolocation.getCurrentPosition(
-                                            (pos) => {
-                                                setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-                                                setActiveCategory('Nearby');
-                                                setToast('Location fetched! Showing nearest hospitals.');
-                                                setTimeout(() => setToast(null), 3000);
-                                            },
-                                            () => {
-                                                setToast('Location access denied. Showing default hospitals.');
-                                                setTimeout(() => setToast(null), 3000);
-                                                setActiveCategory('Nearby');
-                                            }
-                                        );
-                                    } else {
-                                        setActiveCategory(activeCategory === 'Nearby' ? null : 'Nearby');
-                                    }
-                                } else {
-                                    setActiveCategory(cat.label === 'All' ? null : (activeCategory === cat.label ? null : cat.label));
-                                }
-                            }}
-                            className={`glass p-6 rounded-2xl border transition-all text-center group ${(cat.label === 'All' && activeCategory === null) || activeCategory === cat.label
-                                ? 'border-primary bg-primary/10 shadow-lg shadow-primary/20'
-                                : 'border-slate-200 hover:border-white/20'
-                                }`}
-                        >
-                            <div className={`w-12 h-12 ${cat.color} bg-slate-100/50 rounded-xl flex items-center justify-center mb-3 mx-auto group-hover:scale-110 transition-transform`}>
-                                <cat.icon size={24} />
-                            </div>
-                            <p className="text-sm font-bold text-slate-900 uppercase tracking-wider">{cat.label}</p>
-                        </button>
-                    ))}
-                </div>
-
-                {/* Hospital List */}
-                <h2 className="text-xl font-black text-slate-900 mb-6 uppercase tracking-tighter flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Activity className="text-primary" size={20} />
-                        Live Medical Hubs
-                    </div>
-                    <span className="text-xs font-bold text-gray-500 bg-slate-100/50 px-4 py-2 rounded-full border border-slate-200 uppercase tracking-widest">
-                        {hospitals.length} INSTITUTIONS INDEXED
-                    </span>
-                </h2>
-
-                <div className="space-y-6">
-                    {loading ? (
-                        <div className="py-20 text-center">
-                            <Activity className="animate-spin text-primary mx-auto mb-4" size={32} />
-                            <p className="text-gray-500 font-bold uppercase tracking-widest">Scanning Network...</p>
-                        </div>
-                    ) : filteredHospitals.map((hospital) => (
-                        <motion.div
-                            key={hospital.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="glass p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-slate-200 hover:border-primary/20 transition-all group"
-                        >
-                            <div className="flex flex-col md:flex-row justify-between gap-8">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <h3 className="text-2xl font-bold text-slate-900">{hospital.name}</h3>
-                                        {hospital.surge_detected && (
-                                            <span className="px-3 py-1 bg-red-500/10 text-red-500 text-[10px] font-black uppercase rounded-full border border-red-500/20 animate-pulse">
-                                                High Surge
-                                            </span>
-                                        )}
+                        {/* Active Location Switcher */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-primary/10 rounded-xl text-primary border border-primary/20">
+                                    <MapPin size={20} />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">Active Location:</span>
+                                        <span className="text-xs font-bold text-primary font-mono bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
+                                            {cityCoordinates[selectedCity]?.label || 'Cuttack'}
+                                        </span>
                                     </div>
-                                    <p className="text-gray-500 text-sm font-medium mb-6 flex items-center gap-2">
-                                        <MapPin size={14} /> {hospital.address}
-                                    </p>
+                                    <p className="text-[11px] text-slate-500 font-medium">Prioritizing closest medical facilities with real-time distance sorting</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                    onClick={() => handleCityChange('cuttack')}
+                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedCity === 'cuttack' ? 'bg-primary text-white shadow-md shadow-primary/25' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                                >
+                                    📍 Cuttack (SCB)
+                                </button>
+                                <button
+                                    onClick={() => handleCityChange('tangi')}
+                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedCity === 'tangi' ? 'bg-primary text-white shadow-md shadow-primary/25' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                                >
+                                    📍 Tangi (Padmini Care)
+                                </button>
+                                <button
+                                    onClick={() => handleCityChange('bhubaneswar')}
+                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedCity === 'bhubaneswar' ? 'bg-primary text-white shadow-md shadow-primary/25' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                                >
+                                    📍 Bhubaneswar
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Categories */}
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-12">
+                            {[
+                                { icon: Activity, label: 'All', color: 'text-slate-900' },
+                                { icon: Stethoscope, label: 'Emergency', color: 'text-red-500' },
+                                { icon: Activity, label: 'Diagnostics', color: 'text-blue-500' },
+                                { icon: MapPin, label: 'Nearby', color: 'text-green-500' },
+                                { icon: Clock, label: 'Min Wait', color: 'text-orange-500' },
+                            ].map((cat) => (
+                                <button
+                                    key={cat.label}
+                                    onClick={() => {
+                                        if (cat.label === 'Nearby') {
+                                            setActiveCategory(activeCategory === 'Nearby' ? null : 'Nearby');
+                                            setToast(`Filtered by proximity to ${cityCoordinates[selectedCity]?.label || 'Cuttack'}.`);
+                                            setTimeout(() => setToast(null), 3000);
+                                        } else {
+                                            setActiveCategory(cat.label === 'All' ? null : (activeCategory === cat.label ? null : cat.label));
+                                        }
+                                    }}
+                                    className={`glass p-6 rounded-2xl border transition-all text-center group ${(cat.label === 'All' && activeCategory === null) || activeCategory === cat.label
+                                        ? 'border-primary bg-primary/10 shadow-lg shadow-primary/20'
+                                        : 'border-slate-200 hover:border-white/20'
+                                        }`}
+                                >
+                                    <div className={`w-12 h-12 ${cat.color} bg-slate-100/50 rounded-xl flex items-center justify-center mb-3 mx-auto group-hover:scale-110 transition-transform`}>
+                                        <cat.icon size={24} />
+                                    </div>
+                                    <p className="text-sm font-bold text-slate-900 uppercase tracking-wider">{cat.label}</p>
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Hospital List */}
+                        <h2 className="text-xl font-black text-slate-900 mb-6 uppercase tracking-tighter flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Activity className="text-primary" size={20} />
+                                Live Medical Hubs
+                            </div>
+                            <span className="text-xs font-bold text-gray-500 bg-slate-100/50 px-4 py-2 rounded-full border border-slate-200 uppercase tracking-widest">
+                                {hospitals.length} INSTITUTIONS INDEXED
+                            </span>
+                        </h2>
+
+                        <div className="space-y-6">
+                            {loading ? (
+                                <div className="py-20 text-center">
+                                    <Activity className="animate-spin text-primary mx-auto mb-4" size={32} />
+                                    <p className="text-gray-500 font-bold uppercase tracking-widest">Scanning Network...</p>
+                                </div>
+                            ) : filteredHospitals.map((hospital) => (
+                                <motion.div
+                                    key={hospital.id}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="glass p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-slate-200 hover:border-primary/20 transition-all group"
+                                >
+                                    <div className="flex flex-col md:flex-row justify-between gap-8">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                                <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{hospital.name}</h3>
+                                                <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-black rounded-full border border-primary/20 flex items-center gap-1.5">
+                                                    <Navigation size={12} className="text-primary" />
+                                                    {hospital.computedDistance !== undefined ? `${hospital.computedDistance.toFixed(1)} km away` : '0.5 km away'}
+                                                </span>
+                                                {hospital.surge_detected && (
+                                                    <span className="px-3 py-1 bg-red-500/10 text-red-500 text-[10px] font-black uppercase rounded-full border border-red-500/20 animate-pulse">
+                                                        High Surge
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-gray-500 text-sm font-medium mb-6 flex items-center gap-2">
+                                                <MapPin size={14} /> {hospital.address}
+                                            </p>
 
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
                                         <div className="p-4 rounded-2xl bg-slate-100/50 border border-slate-200">

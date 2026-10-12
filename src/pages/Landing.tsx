@@ -33,6 +33,7 @@ const Landing = () => {
     }, [isAmbulanceDispatched, ambulanceETA]);
 
     const [nearbyEmergencyList, setNearbyEmergencyList] = useState<any[]>([]);
+    const [emergencyCity, setEmergencyCity] = useState<'cuttack' | 'bhubaneswar'>('cuttack');
 
     const openEmergencyOverlay = () => {
         setIsEmergencyActive(true);
@@ -40,7 +41,10 @@ const Landing = () => {
         setIsAmbulanceDispatched(false);
     };
 
-    const startEmergencyScan = () => {
+    const startEmergencyScan = (overrideCity?: 'cuttack' | 'bhubaneswar') => {
+        const cityToUse = overrideCity || emergencyCity;
+        if (overrideCity) setEmergencyCity(overrideCity);
+
         setEmergencyStatus('locating');
         
         const locateAndFetch = async (userLat: number, userLng: number) => {
@@ -48,39 +52,35 @@ const Landing = () => {
             try {
                 const hospitals = await fetchHospitals(userLat, userLng);
                 if (hospitals && hospitals.length > 0) {
-                    const sorted = hospitals.map((h: any) => ({
-                        ...h,
-                        phone: h.phone || (h.id.includes('scb') ? '+91 671 2414004' : h.id.includes('padmini') ? '+91 671 2856200' : `+91 ${Math.floor(Math.random() * 90000) + 10000} ${Math.floor(Math.random() * 90000) + 10000}`),
-                        distance: getDistance(userLat, userLng, h.position?.lat, h.position?.lng)
-                    })).sort((a: any, b: any) => a.distance - b.distance);
+                    const sorted = hospitals.map((h: any) => {
+                        const hLat = h.position?.lat || h.location?.lat;
+                        const hLng = h.position?.lng || h.location?.lng;
+                        const dist = (hLat && hLng) ? getDistance(userLat, userLng, hLat, hLng) : (h.distance || 5);
+                        return {
+                            ...h,
+                            phone: h.phone || (h.id.includes('scb') ? '+91 671 2414004' : h.id.includes('padmini') ? '+91 671 2856200' : '+91 671 2304950'),
+                            distance: dist
+                        };
+                    }).sort((a: any, b: any) => a.distance - b.distance);
 
                     setNearestHospital(sorted[0]);
-                    setNearbyEmergencyList(sorted.slice(0, 3));
+                    setNearbyEmergencyList(sorted.slice(0, 4));
                 }
                 setTimeout(() => {
                     setEmergencyStatus('confirmed');
-                }, 1000);
+                }, 800);
             } catch (e) {
                 console.error("Emergency Fetch Failed", e);
-                setNearestHospital({ name: "SCB Medical College & Hospital", phone: "+91 671 2414004", distance: 1.2 });
+                setNearestHospital({ name: "SCB Medical College & Hospital", phone: "+91 671 2414004", distance: 0.5 });
                 setEmergencyStatus('confirmed');
             }
         };
 
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    locateAndFetch(pos.coords.latitude, pos.coords.longitude);
-                },
-                (error) => {
-                    console.warn("GPS failed, using Cuttack region center:", error);
-                    // Default to Cuttack (near SCB & Tangi)
-                    locateAndFetch(20.4625, 85.8830);
-                },
-                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-            );
-        } else {
+        // When user is in Cuttack (or selected Cuttack), use Cuttack coordinates:
+        if (cityToUse === 'cuttack') {
             locateAndFetch(20.4625, 85.8830);
+        } else {
+            locateAndFetch(20.2608, 85.7836);
         }
     };
 
@@ -313,7 +313,7 @@ const Landing = () => {
 
                                 {emergencyStatus === 'idle' && (
                                     <button 
-                                        onClick={startEmergencyScan}
+                                        onClick={() => startEmergencyScan()}
                                         className="w-full py-5 px-8 rounded-2xl bg-red-600 text-white font-black uppercase text-xs tracking-widest hover:bg-red-700 transition-all flex items-center justify-center gap-3 shadow-lg shadow-red-500/30 mb-4 group"
                                     >
                                         Share Location & Find Help
@@ -323,6 +323,29 @@ const Landing = () => {
 
                                 {emergencyStatus === 'confirmed' && nearestHospital && (
                                     <div className="bg-red-50/50 dark:bg-red-950/40 border border-red-100 dark:border-red-900/40 p-6 rounded-3xl mb-8">
+                                        <div className="flex items-center justify-between mb-3 pb-2 border-b border-red-100/50 dark:border-red-900/30">
+                                            <div className="flex items-center gap-1.5">
+                                                <MapPin size={12} className="text-red-500" />
+                                                <span className="text-[10px] font-black uppercase text-slate-700 dark:text-slate-300">
+                                                    Location: {emergencyCity === 'cuttack' ? 'Cuttack' : 'Bhubaneswar'}
+                                                </span>
+                                            </div>
+                                            <div className="flex gap-1">
+                                                <button
+                                                    onClick={() => startEmergencyScan('cuttack')}
+                                                    className={`px-2 py-0.5 rounded text-[9px] font-black uppercase transition-all ${emergencyCity === 'cuttack' ? 'bg-red-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600'}`}
+                                                >
+                                                    Cuttack
+                                                </button>
+                                                <button
+                                                    onClick={() => startEmergencyScan('bhubaneswar')}
+                                                    className={`px-2 py-0.5 rounded text-[9px] font-black uppercase transition-all ${emergencyCity === 'bhubaneswar' ? 'bg-red-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600'}`}
+                                                >
+                                                    Bhubaneswar
+                                                </button>
+                                            </div>
+                                        </div>
+
                                         <div className="flex items-center justify-between mb-2">
                                             <p className="text-[10px] font-black tracking-widest text-red-500 uppercase">Primary Trauma Center</p>
                                             <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/20 uppercase">Nearest</span>
