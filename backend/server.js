@@ -6,6 +6,12 @@ import dotenv from 'dotenv';
 import fetch from 'node-fetch';
 import OpenAI from 'openai';
 import twilio from 'twilio';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distPath = path.join(__dirname, '../dist');
 
 dotenv.config();
 
@@ -1087,6 +1093,20 @@ app.post('/api/queue-status-sms', async (req, res) => {
         console.error('Queue SMS error:', err);
         res.status(500).json({ error: 'SMS service error' });
     }
+});
+
+// Serve static frontend files from dist in production
+app.use(express.static(distPath));
+
+app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
+        return next();
+    }
+    res.sendFile(path.join(distPath, 'index.html'), (err) => {
+        if (err) {
+            next();
+        }
+    });
 });
 
 // Initialize and start server

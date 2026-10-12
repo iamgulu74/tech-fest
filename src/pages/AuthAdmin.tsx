@@ -10,6 +10,7 @@ import {
     updateProfile
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { API_URL } from '../lib/api';
 
 const AuthAdmin = () => {
     const navigate = useNavigate();
@@ -28,7 +29,7 @@ const AuthAdmin = () => {
     useEffect(() => {
         const fetchHospitals = async () => {
             try {
-                const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001/api'}/hospitals`);
+                const response = await fetch(`${API_URL}/hospitals`);
                 if (response.ok) {
                     const data = await response.json();
                     setHospitals(data.map((h: any) => ({ id: h.id, name: h.name })));
