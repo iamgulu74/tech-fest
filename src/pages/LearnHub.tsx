@@ -73,7 +73,6 @@ const LearnHub = () => {
                 <div className="hidden md:flex items-center gap-10 text-xs font-black uppercase tracking-widest">
                     <Link to="/patient" className="text-slate-500 hover:text-slate-900 transition-colors">{t('nav.medqueue')}</Link>
                     <Link to="/learn" className="text-primary border-b-2 border-primary pb-1">{t('nav.learn')}</Link>
-                    <Link to="/pricing" className="text-slate-500 hover:text-slate-900 transition-colors">{t('nav.premium')}</Link>
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
