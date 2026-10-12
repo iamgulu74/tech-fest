@@ -88,20 +88,13 @@ const Landing = () => {
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
-                    const lat = pos.coords.latitude;
-                    const lng = pos.coords.longitude;
-                    // If desktop ISP reports Bhubaneswar (20.15 - 20.40) while user is in Tangi, use verified Tangi GPS (20.5585586, 85.9995065)
-                    if (lat >= 20.15 && lat <= 20.40) {
-                        locateAndFetch(20.5585586, 85.9995065);
-                    } else {
-                        locateAndFetch(lat, lng);
-                    }
+                    locateAndFetch(pos.coords.latitude, pos.coords.longitude);
                 },
                 () => {
-                    // Fallback to real user location in Tangi (Cuttack district)
+                    // Fallback if GPS access is denied
                     locateAndFetch(20.5585586, 85.9995065);
                 },
-                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         } else {
             locateAndFetch(20.5585586, 85.9995065);

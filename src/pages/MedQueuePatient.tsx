@@ -132,32 +132,66 @@ const MedQueuePatient = () => {
         }
     };
 
-    useEffect(() => {
-        // Clear all mock booking history as requested
-        localStorage.removeItem('medQueueHistory');
-        setBookingHistory([]);
+    const [isLiveGps, setIsLiveGps] = useState(false);
 
-        // Fetch real GPS location
+    const requestLiveGps = () => {
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     const lat = pos.coords.latitude;
                     const lng = pos.coords.longitude;
-                    // If desktop ISP reports Bhubaneswar (20.15 - 20.40) while user is in Tangi, use verified Tangi GPS (20.5585586, 85.9995065)
-                    if (lat >= 20.15 && lat <= 20.40) {
-                        setUserLocation({ lat: 20.5585586, lng: 85.9995065 });
-                    } else {
-                        setUserLocation({ lat, lng });
-                    }
+                    setUserLocation({ lat, lng });
+                    setIsLiveGps(true);
+                    setToast(`📍 Live GPS acquired: ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`);
+                    setTimeout(() => setToast(null), 3000);
                 },
                 (err) => {
-                    console.warn("GPS timeout or permission fallback to Tangi:", err);
-                    setUserLocation({ lat: 20.5585586, lng: 85.9995065 });
+                    console.warn("GPS request error:", err);
+                    setToast("⚠️ Could not read GPS. Please allow location access in your browser.");
+                    setTimeout(() => setToast(null), 4000);
                 },
-                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
-        } else {
-            setUserLocation({ lat: 20.5585586, lng: 85.9995065 });
+        }
+    };
+
+    useEffect(() => {
+        // Clear all mock booking history as requested
+        localStorage.removeItem('medQueueHistory');
+        setBookingHistory([]);
+
+        // Fetch real device GPS location
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    setUserLocation({ lat, lng });
+                    setIsLiveGps(true);
+                },
+                (err) => {
+                    console.warn("GPS error fallback:", err);
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+
+            // Continuously track real-time position
+            const watchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    setUserLocation({ lat, lng });
+                    setIsLiveGps(true);
+                },
+                (err) => {
+                    console.warn("GPS watch error:", err);
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
+            );
+
+            return () => {
+                navigator.geolocation.clearWatch(watchId);
+            };
         }
     }, []);
 
@@ -832,15 +866,25 @@ const MedQueuePatient = () => {
                         </div>
 
                         {/* Hospital List */}
-                        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-6 uppercase tracking-tighter flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                            <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter flex items-center gap-2">
                                 <Activity className="text-primary" size={20} />
                                 Live Medical Hubs
+                            </h2>
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <button
+                                    onClick={requestLiveGps}
+                                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all uppercase tracking-wider shadow-sm"
+                                    title="Click to refresh your real device GPS location"
+                                >
+                                    <Navigation size={12} className={isLiveGps ? "animate-pulse text-emerald-500" : ""} />
+                                    <span>{isLiveGps ? `GPS: ${userLocation.lat.toFixed(4)}°N, ${userLocation.lng.toFixed(4)}°E` : "📍 Use My GPS"}</span>
+                                </button>
+                                <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-slate-100/50 dark:bg-slate-800/50 px-4 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 uppercase tracking-widest">
+                                    {filteredHospitals.length} INSTITUTIONS
+                                </span>
                             </div>
-                            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-slate-100/50 dark:bg-slate-800/50 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 uppercase tracking-widest">
-                                {filteredHospitals.length} INSTITUTIONS INDEXED
-                            </span>
-                        </h2>
+                        </div>
 
                         <div className="space-y-6">
                             {loading ? (
@@ -928,9 +972,9 @@ const MedQueuePatient = () => {
                                     </PixelButton>
                                     <PixelButton
                                         onClick={() => {
-                                            const originCoord = `${userLocation.lat},${userLocation.lng}`;
                                             const destinationQuery = encodeURIComponent(`${hospital.name}, ${hospital.address}`);
-                                            window.open(`https://www.google.com/maps/dir/${originCoord}/${destinationQuery}`, '_blank');
+                                            // Omitting origin tells Google Maps to use device's live GPS as "Your location"
+                                            window.open(`https://www.google.com/maps/dir/?api=1&destination=${destinationQuery}`, '_blank');
                                         }}
                                         color="neutral"
                                         className="w-full"
