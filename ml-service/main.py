@@ -20,14 +20,9 @@ class QueueData(BaseModel):
     doctors_available: int
     hour_of_day: int
 
-class CareerProfile(BaseModel):
-    aptitude_scores: dict
-    interests: List[str]
-    skills: List[str]
-
 @app.get("/")
 async def root():
-    return {"status": "ML service is online", "models": ["wait_time_lstm", "career_matcher_xgb"]}
+    return {"status": "ML service is online", "models": ["wait_time_lstm"]}
 
 @app.post("/predict/wait-time")
 async def predict_wait_time(data: QueueData):
@@ -44,20 +39,6 @@ async def predict_wait_time(data: QueueData):
         "estimated_wait_minutes": round(base_wait + noise, 1),
         "confidence": 0.92,
         "surge_detected": base_wait > 30
-    }
-
-@app.post("/predict/career-match")
-async def predict_career_match(profile: CareerProfile):
-    # Simulated Career Matching Logic
-    # In production: vector_db.search(profile_embedding)
-    careers = [
-        {"title": "Software Architect", "score": random.uniform(85, 98)},
-        {"title": "Data Scientist", "score": random.uniform(80, 95)},
-        {"title": "AI Researcher", "score": random.uniform(75, 92)}
-    ]
-    return {
-        "matches": sorted(careers, key=lambda x: x["score"], reverse=True),
-        "success_probability": round(random.uniform(0.7, 0.95), 2)
     }
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ interface PixelButtonProps {
     className?: string;
     type?: 'button' | 'submit' | 'reset';
     color?: 'yellow' | 'primary' | 'secondary' | 'red' | 'neutral';
+    disabled?: boolean;
 }
 
 const PixelButton: React.FC<PixelButtonProps> = ({
@@ -13,7 +14,8 @@ const PixelButton: React.FC<PixelButtonProps> = ({
     onClick,
     className = "",
     type = "button",
-    color = "yellow"
+    color = "yellow",
+    disabled = false
 }) => {
     // Dynamic color support based on the user's style
     const colorVars = {
@@ -30,7 +32,8 @@ const PixelButton: React.FC<PixelButtonProps> = ({
         <button
             type={type}
             onClick={onClick}
-            className={`pixel-button ${className}`}
+            disabled={disabled}
+            className={`pixel-button ${className} ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
             style={{ '--active-outline': selectedColor.outline } as any}
         >
             <div style={{ backgroundColor: selectedColor.bg }}>

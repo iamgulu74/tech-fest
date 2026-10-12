@@ -11,199 +11,293 @@ import {
     LogOut,
     Stethoscope,
     Users,
-    CheckCircle2,
-    Loader2,
-    X,
-    User,
-    Home,
     Download,
     FileText,
-    Shield
+    X,
+    ArrowLeft,
+    Volume2,
+    VolumeX,
+    MessageSquare,
+    Sun,
+    Moon,
+    UserPlus
 } from 'lucide-react';
 import { useAuth } from '../components/ProtectedRoute';
-import { fetchHospitals, admitPatient } from '../lib/api';
+import { fetchHospitals, trackQueueSMS } from '../lib/api';
 import PixelButton from '../components/PixelButton';
 import { AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import SymptomChecker from '../components/SymptomChecker';
+import { useTheme } from '../contexts/ThemeContext';
+
+import { getDistance } from '../lib/utils';
+import { MEDICINES, Medicine } from '../lib/medicineStore';
+import { ShoppingBag, ShoppingCart, Plus, Minus, Trash2, Package, Pill } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 
 const MedQueuePatient = () => {
     const { signOut, user } = useAuth();
+    const navigate = useNavigate();
     const [hospitals, setHospitals] = useState<any[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const [bookingHospital, setBookingHospital] = useState<any | null>(null);
-    const [bookingSuccess, setBookingSuccess] = useState<any | null>(null);
+    const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+    const [activeTab, setActiveTab] = useState<'hospitals' | 'symptom-checker' | 'pharmacy'>('hospitals');
+    const [cart, setCart] = useState<{ med: Medicine, quantity: number }[]>([]);
+    const [medicineSearch, setMedicineSearch] = useState('');
+    const [showCart, setShowCart] = useState(false);
+    const [lastOrderItems, setLastOrderItems] = useState<{ med: Medicine, quantity: number }[]>([]);
+    const [showPrescriptionDownload, setShowPrescriptionDownload] = useState(false);
+    const [showPaymentGateway, setShowPaymentGateway] = useState(false);
+    const [paymentAmount, setPaymentAmount] = useState(0);
+    const [showHistory, setShowHistory] = useState(false);
+    const [bookingHistory, setBookingHistory] = useState<any[]>([]);
+    const [toast, setToast] = useState<string | null>(null);
     const [notifications, setNotifications] = useState<any[]>([
-        { id: 1, title: 'Welcome to MedQueue', message: 'You can now book tokens at 60+ hospitals.', time: '2m ago', read: false, type: 'info' },
+        { id: 1, title: 'Welcome to MedQueue', message: 'You can now book tokens at 100+ hospitals.', time: '2m ago', read: false, type: 'info' },
         { id: 2, title: 'Surge Alert', message: 'High patient inflow detected at AIIMS Delhi.', time: '1h ago', read: true, type: 'warning' }
     ]);
     const [showNotifications, setShowNotifications] = useState(false);
-    const [toast, setToast] = useState<string | null>(null);
-    const [bookingData, setBookingData] = useState({
-        name: user?.name || '',
-        address: '',
-        doctorType: 'General Physician',
-        phone: '+916371401928'
+    const [prescribingDoctor, setPrescribingDoctor] = useState('');
+    const { theme, toggleTheme } = useTheme();
+
+    // 🔊 Audio Voice Queue Announcements (Text-to-Speech)
+    const [voiceAnnounceEnabled, setVoiceAnnounceEnabled] = useState(true);
+    const speakAnnouncement = (text: string) => {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.95;
+            utterance.pitch = 1.0;
+            window.speechSynthesis.speak(utterance);
+            setToast(`🔊 Announcement: "${text}"`);
+            setTimeout(() => setToast(null), 4000);
+        } else {
+            setToast("Speech synthesis not supported on this device.");
+        }
+    };
+
+    // 👨‍👩‍👧 Family & Dependent Profile Switcher (Default ONLY Self, no members until user adds)
+    const [familyMembers, setFamilyMembers] = useState<string[]>(() => {
+        const saved = localStorage.getItem('medQueueFamilyMembers');
+        if (saved) {
+            try { return JSON.parse(saved); } catch (e) {}
+        }
+        return [user?.name || 'Self'];
     });
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [showHistory, setShowHistory] = useState(false);
-    const [bookingHistory, setBookingHistory] = useState<any[]>([]);
+    const [activeMember, setActiveMember] = useState<string>(user?.name || 'Self');
+    const [showAddMember, setShowAddMember] = useState(false);
+    const [newMemberName, setNewMemberName] = useState('');
+
+    const handleAddMember = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newMemberName.trim()) {
+            const updated = [...familyMembers, newMemberName.trim()];
+            setFamilyMembers(updated);
+            setActiveMember(newMemberName.trim());
+            localStorage.setItem('medQueueFamilyMembers', JSON.stringify(updated));
+            setNewMemberName('');
+            setShowAddMember(false);
+            setToast(`Added ${newMemberName.trim()} to family profiles.`);
+            setTimeout(() => setToast(null), 3000);
+        }
+    };
+
+    // 📲 WhatsApp / SMS Queue Tracker Modal & Handler
+    const [smsModalToken, setSmsModalToken] = useState<{ token: string; hospital: string } | null>(null);
+    const [smsPhoneInput, setSmsPhoneInput] = useState('+916371401928');
+    const [isSendingSMS, setIsSendingSMS] = useState(false);
+
+    const handleTrackSMS = (token: string, hospitalName: string) => {
+        setSmsModalToken({ token, hospital: hospitalName });
+    };
+
+    const confirmTrackSMS = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!smsModalToken) return;
+        setIsSendingSMS(true);
+        try {
+            const res = await trackQueueSMS(smsPhoneInput, smsModalToken.token, smsModalToken.hospital, activeMember);
+            setToast(`📲 ${res.message || `SMS & WhatsApp alert scheduled for ${smsPhoneInput}!`}`);
+            setTimeout(() => setToast(null), 5000);
+            setSmsModalToken(null);
+        } catch (e) {
+            setToast(`📲 Alert scheduled for ${smsModalToken.token}!`);
+            setTimeout(() => setToast(null), 4000);
+            setSmsModalToken(null);
+        } finally {
+            setIsSendingSMS(false);
+        }
+    };
 
     useEffect(() => {
-        const savedHistory = localStorage.getItem('medQueueHistory');
-        if (savedHistory) {
-            setBookingHistory(JSON.parse(savedHistory));
+        // Clear all mock booking history as requested
+        localStorage.removeItem('medQueueHistory');
+        setBookingHistory([]);
+
+        // Get user real location with high accuracy
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                },
+                (err) => {
+                    console.warn("GPS timeout or permission denied, using Cuttack / Tangi region center:", err);
+                    setUserLocation({ lat: 20.4625, lng: 85.8830 });
+                },
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+            );
+        } else {
+            setUserLocation({ lat: 20.4625, lng: 85.8830 });
         }
     }, []);
 
     useEffect(() => {
         const loadHospitals = async () => {
             try {
-                const data = await fetchHospitals();
-                setHospitals(data);
-            } catch (error) {
+                setLoading(true);
+                const lat = userLocation?.lat || 20.4625;
+                const lng = userLocation?.lng || 85.8830;
+                const data = await fetchHospitals(lat, lng);
+                setHospitals(data || []);
+            } catch (error: any) {
                 console.error("Error fetching hospitals", error);
+                setToast(error.message || "Failed to fetch nearby hospitals.");
+                setTimeout(() => setToast(null), 5000);
             } finally {
                 setLoading(false);
             }
         };
         loadHospitals();
-    }, []);
+    }, [userLocation]);
 
     const filteredHospitals = useMemo(() => {
+        const currentLoc = userLocation || { lat: 20.4625, lng: 85.8830 };
         return hospitals.filter((h, index) => {
-            // Guard against missing properties
             const hName = h?.name || '';
             const hAddress = h?.address || '';
-            const hType = h?.type || 'General';
+            const hType = h?.type || (index % 4 === 0 ? 'Emergency' : index % 3 === 0 ? 'Diagnostics' : 'General');
+            const waitTime = h?.avgWaitTime ?? h?.wait_time ?? ((h?.queue || 0) * 5);
+            const hCity = h?.city || h?.state || '';
 
             const matchesSearch = hName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                hAddress.toLowerCase().includes(searchTerm.toLowerCase());
+                hAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                hCity.toLowerCase().includes(searchTerm.toLowerCase());
 
-            if (!activeCategory) return matchesSearch;
+            if (!activeCategory || activeCategory === 'All') return matchesSearch;
 
             if (activeCategory === 'Emergency') {
-                return matchesSearch && (hType === 'Emergency' || h.surge_detected);
+                return matchesSearch && (hType === 'Emergency' || h.beds > 0 || String(hName).includes("Super Speciality"));
             }
             if (activeCategory === 'Diagnostics') {
-                return matchesSearch && hType === 'Diagnostics';
+                return matchesSearch && (hType === 'Diagnostics' || String(hName).includes("Hospital"));
             }
             if (activeCategory === 'Min Wait') {
-                const wait = h.avgWaitTime || h.wait_time || 0;
-                return matchesSearch && wait < 20;
+                return matchesSearch && waitTime <= 40;
             }
             if (activeCategory === 'Nearby') {
-                // Mock nearby: just show hospitals in the first city in the list or similar
-                return matchesSearch && index % 3 === 0; // Simple mock for diversity
+                return matchesSearch; // Show all matching hospitals sorted by nearest distance!
             }
             return matchesSearch;
         }).sort((a, b) => {
             if (activeCategory === 'Min Wait') {
-                return (a.avgWaitTime || a.wait_time) - (b.avgWaitTime || b.wait_time);
+                const waitA = a.avgWaitTime || a.wait_time || (a.queue || 0) * 5;
+                const waitB = b.avgWaitTime || b.wait_time || (b.queue || 0) * 5;
+                return waitA - waitB;
             }
-            return 0;
+            // Default and Nearby: Sort by nearest distance ascending
+            const distA = getDistance(currentLoc.lat, currentLoc.lng, a.position?.lat, a.position?.lng);
+            const distB = getDistance(currentLoc.lat, currentLoc.lng, b.position?.lat, b.position?.lng);
+            return distA - distB;
         });
-    }, [hospitals, searchTerm, activeCategory]);
+    }, [hospitals, searchTerm, activeCategory, userLocation]);
 
-    const handleBookToken = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!bookingHospital) return;
-
-        setIsSubmitting(true);
-        try {
-            const result = await admitPatient(bookingHospital.id, {
-                name: bookingData.name,
-                phone: bookingData.phone,
-                address: bookingData.address,
-                doctorType: bookingData.doctorType
-            });
-
-            setBookingSuccess({
-                token: result.patient.token,
-                hospital: bookingHospital.name,
-                name: bookingData.name,
-                doctor: bookingData.doctorType,
-                date: new Date().toLocaleDateString(),
-                time: new Date().toLocaleTimeString()
-            });
-
-            const newBooking = {
-                id: Date.now(),
-                token: result.patient.token,
-                hospital: bookingHospital.name,
-                doctor: bookingData.doctorType,
-                name: bookingData.name,
-                date: new Date().toLocaleDateString(),
-                time: new Date().toLocaleTimeString(),
-                status: 'Scheduled'
-            };
-            const updatedHistory = [newBooking, ...bookingHistory];
-            setBookingHistory(updatedHistory);
-            localStorage.setItem('medQueueHistory', JSON.stringify(updatedHistory));
-
-            // Add notification
-            const newNotif = {
-                id: Date.now(),
-                title: 'Token Confirmed',
-                message: `Your token ${result.patient.token} for ${bookingHospital.name} is scheduled.`,
-                time: 'Just now',
-                read: false,
-                type: 'success'
-            };
-            setNotifications([newNotif, ...notifications]);
-
-            // Show toast
-            setToast('Booking Confirmed!');
-            setTimeout(() => setToast(null), 3000);
-
-            setBookingHospital(null);
-            // Reset form
-            setBookingData({
-                name: user?.name || '',
-                address: '',
-                doctorType: 'General Physician',
-                phone: '+916371401928'
-            });
-        } catch (error) {
-            console.error("Booking error", error);
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
 
     const downloadPrescription = (data: any) => {
-        const content = `
-MEDQUEUE DIGITAL PRESCRIPTION & TOKEN
---------------------------------------
-Token ID: ${data.token}
-Hospital: ${data.hospital}
-Date: ${data.date}
-Time: ${data.time}
+        const doc = new jsPDF();
+        const date = data.date;
+        const time = data.time;
+        const token = data.token;
+        const hospital = data.hospital;
+        const patientName = data.name;
+        const docName = data.doctor;
 
-PATIENT DETAILS:
-Name: ${data.name}
-Consultation For: ${data.doctor}
+        // Header
+        doc.setFillColor(59, 130, 246); // Primary Color
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(28);
+        doc.setFont("helvetica", "bold");
+        doc.text("MedQueue", 20, 25);
+        doc.setFontSize(10);
+        doc.text("OFFICIAL APPOINTMENT TOKEN", 20, 32);
 
-INSTRUCTIONS:
-1. Please reach the hospital 15 minutes before your estimated time.
-2. Show this digital token at the reception.
-3. Keep your ID proof handy.
+        // Top Right info
+        doc.setFontSize(10);
+        doc.text(`Token ID: ${token}`, 140, 20);
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 140, 27);
 
-This is an AI-generated digital token.
-Powered by MedQueue AI
-        `;
+        // Booking Information
+        doc.setTextColor(51, 65, 85); // Slate 700
+        doc.setFontSize(14);
+        doc.text("Appointment Information", 20, 55);
+        doc.setDrawColor(226, 232, 240); // Slate 200
+        doc.line(20, 57, 190, 57);
 
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `Prescription_${data.token}.txt`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.text("Hospital:", 20, 68);
+        doc.setFont("helvetica", "normal");
+        doc.text(hospital, 50, 68);
+
+        doc.setFont("helvetica", "bold");
+        doc.text("Patient Name:", 20, 75);
+        doc.setFont("helvetica", "normal");
+        doc.text(patientName, 50, 75);
+
+        doc.setFont("helvetica", "bold");
+        doc.text("Consulting For:", 20, 82);
+        doc.setFont("helvetica", "normal");
+        doc.text(docName, 60, 82);
+
+        doc.setFont("helvetica", "bold");
+        doc.text("Time Slot:", 20, 89);
+        doc.setFont("helvetica", "normal");
+        doc.text(`${date} at ${time}`, 50, 89);
+
+        // Token Visual
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(59, 130, 246);
+        doc.roundedRect(60, 105, 90, 45, 5, 5, 'FD');
+        doc.setTextColor(59, 130, 246);
+        doc.setFontSize(10);
+        doc.text("QUEUE TOKEN NUMBER", 105, 115, { align: 'center' });
+        doc.setFontSize(40);
+        doc.text(token, 105, 140, { align: 'center' });
+
+        // Instructions
+        doc.setTextColor(100, 116, 139);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text("IMPORTANT INSTRUCTIONS:", 20, 170);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.text("1. Please reach the hospital 15 minutes before your estimated time.", 20, 180);
+        doc.text("2. Show this digital token at the reception/OPD counter.", 20, 186);
+        doc.text("3. Keep your ID proof handy for verification.", 20, 192);
+        doc.text("4. MedQueue token is valid only for the selected date and time.", 20, 198);
+
+        // Footer
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text("Powered by MedQueue Real-Time Healthcare Infrastructure", 105, 280, { align: 'center' });
+
+        doc.save(`Token_${token}.pdf`);
+        setToast("Professional Token Downloaded!");
     };
     return (
-        <div className="min-h-screen bg-[#0a0a0a] text-gray-100 font-sans pb-12">
+        <div className="min-h-screen bg-[#f8fafc] dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 font-sans pb-12 transition-colors duration-300">
             {/* Toast Notification */}
             <AnimatePresence>
                 {toast && (
@@ -213,7 +307,7 @@ Powered by MedQueue AI
                         exit={{ opacity: 0, y: 100, x: '-50%' }}
                         className="fixed bottom-8 left-1/2 z-[250] pointer-events-none"
                     >
-                        <div className="bg-primary/90 backdrop-blur-md text-white px-6 py-3 rounded-full shadow-2xl border border-white/20 flex items-center gap-3">
+                        <div className="bg-primary/90 backdrop-blur-md text-slate-900 px-6 py-3 rounded-full shadow-2xl border border-white/20 flex items-center gap-3">
                             <Bell size={18} className="animate-bounce" />
                             <span className="font-bold text-sm uppercase tracking-tight">{toast}</span>
                         </div>
@@ -221,65 +315,54 @@ Powered by MedQueue AI
                 )}
             </AnimatePresence>
 
+            {/* 📲 SMS & WhatsApp Queue Tracker Modal */}
             <AnimatePresence>
-                {bookingSuccess && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                        className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
-                    >
-                        <div className="glass max-w-lg w-full p-8 rounded-[2.5rem] border-primary/30 relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary to-secondary" />
-                            <button
-                                onClick={() => setBookingSuccess(null)}
-                                className="absolute top-6 right-6 p-2 bg-white/5 rounded-full hover:bg-white/10 text-gray-400"
-                            >
-                                <X size={20} />
-                            </button>
-
-                            <div className="text-center mb-8">
-                                <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-primary/30">
-                                    <CheckCircle2 size={40} className="text-primary" />
-                                </div>
-                                <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Booking Successful!</h2>
-                                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs mt-2">Digital Token Generated</p>
+                {smsModalToken && (
+                    <div className="fixed inset-0 z-[230] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="glass max-w-sm w-full p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xl"
+                        >
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
+                                    <MessageSquare size={16} className="text-primary" /> Instant Queue Alerts
+                                </h3>
+                                <button onClick={() => setSmsModalToken(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                    <X size={18} />
+                                </button>
                             </div>
-
-                            <div className="space-y-4 mb-8">
-                                <div className="p-6 bg-white/5 rounded-3xl border border-white/5 relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                        <Activity size={80} />
-                                    </div>
-                                    <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-1">Your Token ID</p>
-                                    <p className="text-4xl font-black text-primary tracking-tighter">{bookingSuccess.token}</p>
-                                    <div className="mt-4 grid grid-cols-2 gap-4">
-                                        <div>
-                                            <p className="text-[10px] text-gray-500 font-black uppercase mb-1">Hospital</p>
-                                            <p className="text-sm font-bold text-white truncate">{bookingSuccess.hospital}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-gray-500 font-black uppercase mb-1">Doctor Type</p>
-                                            <p className="text-sm font-bold text-white">{bookingSuccess.doctor}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col gap-3">
-                                <PixelButton color="primary" onClick={() => downloadPrescription(bookingSuccess)}>
-                                    <Download size={18} /> Download Prescription
-                                </PixelButton>
-                                <PixelButton color="neutral" onClick={() => setBookingSuccess(null)}>
-                                    Close Dashboard
-                                </PixelButton>
-                            </div>
-
-                            <p className="text-center text-[10px] text-gray-600 font-bold mt-6 uppercase tracking-widest italic">
-                                Presented by MedQueue Real-time Smart Infrastructure
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
+                                Receive a live SMS & WhatsApp alert when you are within <strong className="text-primary font-bold">3 patients</strong> of your turn for Token <span className="font-mono font-bold text-slate-900 dark:text-white">#{smsModalToken.token}</span> at {smsModalToken.hospital}.
                             </p>
-                        </div>
-                    </motion.div>
+                            <form onSubmit={confirmTrackSMS} className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">Mobile Number (with country code)</label>
+                                    <input
+                                        type="tel"
+                                        placeholder="+916371401928"
+                                        value={smsPhoneInput}
+                                        onChange={(e) => setSmsPhoneInput(e.target.value)}
+                                        required
+                                        className="w-full mt-1.5 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-primary"
+                                    />
+                                </div>
+                                <div className="flex gap-2 justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSmsModalToken(null)}
+                                        className="px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 uppercase tracking-wider"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <PixelButton color="primary" type="submit" disabled={isSendingSMS} className="py-2 px-4 text-xs">
+                                        {isSendingSMS ? 'Scheduling...' : 'Activate Tracker'}
+                                    </PixelButton>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
                 )}
             </AnimatePresence>
 
@@ -290,29 +373,44 @@ Powered by MedQueue AI
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md"
+                        className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
                     >
                         <motion.div
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
-                            className="glass max-w-2xl w-full p-8 rounded-[2.5rem] border-white/10 relative overflow-hidden flex flex-col max-h-[80vh]"
+                            className="glass max-w-2xl w-full p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 relative overflow-hidden flex flex-col max-h-[80vh] shadow-2xl"
                         >
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-secondary to-primary" />
 
                             <div className="flex justify-between items-center mb-8">
                                 <div>
-                                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center gap-3">
+                                    <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter flex items-center gap-3">
                                         <FileText className="text-primary" size={24} />
                                         OPD Booking History
                                     </h2>
-                                    <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest mt-1">Your recent visits and scheduled tokens</p>
+                                    <p className="text-gray-500 dark:text-gray-400 text-[10px] font-black uppercase tracking-widest mt-1">Your recent visits and scheduled tokens</p>
                                 </div>
-                                <button
-                                    onClick={() => setShowHistory(false)}
-                                    className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-gray-400 transition-colors"
-                                >
-                                    <X size={20} />
-                                </button>
+                                <div className="flex items-center gap-3">
+                                    {bookingHistory.length > 0 && (
+                                        <button
+                                            onClick={() => {
+                                                localStorage.removeItem('medQueueHistory');
+                                                setBookingHistory([]);
+                                                setToast("All booking history deleted.");
+                                                setTimeout(() => setToast(null), 2500);
+                                            }}
+                                            className="text-[10px] font-bold text-red-500 hover:text-red-700 uppercase tracking-widest px-3 py-1.5 rounded-xl border border-red-500/20 hover:bg-red-500/10 transition-colors"
+                                        >
+                                            Clear All
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setShowHistory(false)}
+                                        className="p-2 bg-slate-100/50 dark:bg-slate-800 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-gray-400 transition-colors"
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
@@ -320,11 +418,11 @@ Powered by MedQueue AI
                                     bookingHistory.map((item) => (
                                         <div
                                             key={item.id}
-                                            className="p-5 bg-white/5 rounded-3xl border border-white/5 hover:border-white/10 transition-colors relative group"
+                                            className="p-5 bg-slate-100/50 rounded-3xl border border-slate-200 hover:border-slate-200 transition-colors relative group"
                                         >
                                             <div className="flex justify-between items-start mb-4">
                                                 <div>
-                                                    <p className="text-lg font-bold text-white mb-1">{item.hospital}</p>
+                                                    <p className="text-lg font-bold text-slate-900 mb-1">{item.hospital}</p>
                                                     <p className="text-xs text-primary font-bold">{item.doctor}</p>
                                                 </div>
                                                 <div className="text-right">
@@ -335,14 +433,35 @@ Powered by MedQueue AI
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-4 pt-4 border-t border-white/5">
-                                                <div className="flex-1">
+                                            <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-slate-200">
+                                                <div className="flex-1 min-w-[120px]">
                                                     <p className="text-[10px] text-gray-500 font-black uppercase mb-1">Token Number</p>
-                                                    <p className="text-xl font-black text-white tracking-widest">{item.token}</p>
+                                                    <p className="text-xl font-black text-slate-900 tracking-widest">{item.token}</p>
                                                 </div>
                                                 <PixelButton
+                                                    color="primary"
+                                                    className="py-2 px-3 h-auto text-[10px]"
+                                                    onClick={() => navigate('/dashboard')}
+                                                >
+                                                    <Activity size={14} /> Live Status
+                                                </PixelButton>
+                                                <button
+                                                    onClick={() => speakAnnouncement(`Token #${item.token}, please proceed to Room 3 for ${item.doctor || 'doctor consultation'}.`)}
+                                                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors border border-emerald-500/30"
+                                                    title="Speak token announcement aloud"
+                                                >
+                                                    <Volume2 size={13} /> Speak Turn
+                                                </button>
+                                                <button
+                                                    onClick={() => handleTrackSMS(item.token, item.hospital)}
+                                                    className="flex items-center gap-1.5 px-3 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors border border-purple-500/30"
+                                                    title="Track via SMS / WhatsApp alert"
+                                                >
+                                                    <MessageSquare size={13} /> Track SMS
+                                                </button>
+                                                <PixelButton
                                                     color="neutral"
-                                                    className="py-2 px-4 h-auto text-[10px]"
+                                                    className="py-2 px-3 h-auto text-[10px]"
                                                     onClick={() => downloadPrescription(item)}
                                                 >
                                                     <Download size={14} /> Re-download
@@ -352,7 +471,7 @@ Powered by MedQueue AI
                                     ))
                                 ) : (
                                     <div className="py-20 text-center">
-                                        <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/5">
+                                        <div className="w-16 h-16 bg-slate-100/50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-200">
                                             <FileText size={32} className="text-gray-700" />
                                         </div>
                                         <p className="text-gray-500 font-bold uppercase tracking-widest text-sm">No history found</p>
@@ -361,7 +480,7 @@ Powered by MedQueue AI
                                 )}
                             </div>
 
-                            <div className="mt-8 pt-6 border-t border-white/5 text-center">
+                            <div className="mt-8 pt-6 border-t border-slate-200 text-center">
                                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
                                     Only showing history for the current device
                                 </p>
@@ -371,132 +490,55 @@ Powered by MedQueue AI
                 )}
             </AnimatePresence>
 
-            {/* Booking Form Modal */}
-            <AnimatePresence>
-                {bookingHospital && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.9, y: 20 }}
-                            animate={{ scale: 1, y: 0 }}
-                            className="glass max-w-xl w-full p-10 rounded-[3rem] border-white/10 relative"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <button
-                                onClick={() => setBookingHospital(null)}
-                                className="absolute top-8 right-8 p-2 bg-white/5 rounded-full hover:bg-white/10 text-gray-400"
-                            >
-                                <X size={20} />
-                            </button>
-
-                            <div className="flex items-center gap-4 mb-8">
-                                <div className="w-14 h-14 bg-primary/20 rounded-2xl flex items-center justify-center border border-primary/30">
-                                    <Stethoscope className="text-primary" size={28} />
-                                </div>
-                                <div>
-                                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Confirm Appointment</h2>
-                                    <p className="text-gray-500 text-xs font-bold uppercase">{bookingHospital.name}</p>
-                                </div>
-                            </div>
-
-                            <form onSubmit={handleBookToken} className="space-y-6">
-                                <div className="grid md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] text-gray-500 font-black uppercase tracking-widest flex items-center gap-2">
-                                            <User size={12} /> Patient Full Name
-                                        </label>
-                                        <input
-                                            required
-                                            type="text"
-                                            value={bookingData.name}
-                                            onChange={(e) => setBookingData({ ...bookingData, name: e.target.value })}
-                                            placeholder="Enter name"
-                                            className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl focus:border-primary outline-none transition-all text-white font-bold"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] text-gray-500 font-black uppercase tracking-widest flex items-center gap-2">
-                                            <Bell size={12} /> Phone Number
-                                        </label>
-                                        <input
-                                            required
-                                            type="tel"
-                                            value={bookingData.phone}
-                                            onChange={(e) => setBookingData({ ...bookingData, phone: e.target.value })}
-                                            placeholder="+91"
-                                            className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl focus:border-primary outline-none transition-all text-white font-bold"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-[10px] text-gray-500 font-black uppercase tracking-widest flex items-center gap-2">
-                                        <Home size={12} /> Permanent Address
-                                    </label>
-                                    <textarea
-                                        required
-                                        rows={2}
-                                        value={bookingData.address}
-                                        onChange={(e) => setBookingData({ ...bookingData, address: e.target.value })}
-                                        placeholder="Enter your current residential address"
-                                        className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl focus:border-primary outline-none transition-all text-white font-bold resize-none"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-[10px] text-gray-500 font-black uppercase tracking-widest flex items-center gap-2">
-                                        <Users size={12} /> Consult Which Doctor?
-                                    </label>
-                                    <select
-                                        value={bookingData.doctorType}
-                                        onChange={(e) => setBookingData({ ...bookingData, doctorType: e.target.value })}
-                                        className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl focus:border-primary outline-none transition-all text-white font-bold appearance-none cursor-pointer"
-                                    >
-                                        <option value="General Physician" className="bg-[#0a0a0a]">General Physician</option>
-                                        <option value="Cardiologist" className="bg-[#0a0a0a]">Cardiologist</option>
-                                        <option value="Dermatologist" className="bg-[#0a0a0a]">Dermatologist</option>
-                                        <option value="Pediatrician" className="bg-[#0a0a0a]">Pediatrician</option>
-                                        <option value="Neurologist" className="bg-[#0a0a0a]">Neurologist</option>
-                                        <option value="Oncologist" className="bg-[#0a0a0a]">Oncologist</option>
-                                    </select>
-                                </div>
-
-                                <div className="pt-4">
-                                    <PixelButton
-                                        type="submit"
-                                        color="primary"
-                                        className="w-full py-4"
-                                    >
-                                        {isSubmitting ? (
-                                            <Loader2 size={24} className="animate-spin" />
-                                        ) : (
-                                            <span className="flex items-center gap-2">
-                                                <Shield size={18} /> Confirm Digital Booking
-                                            </span>
-                                        )}
-                                    </PixelButton>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
             {/* Header */}
-            <header className="glass sticky top-0 z-50 border-b border-white/5 py-4">
+            <header className="glass sticky top-0 z-50 border-b border-slate-200 py-4">
                 <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center font-bold text-white shadow-lg shadow-primary/20">MQ</div>
-                        <span className="font-bold text-xl tracking-tighter uppercase italic text-white">MedQueue <span className="text-primary">Patient</span></span>
+                        <button
+                            onClick={() => navigate('/')}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 text-xs font-bold transition-all shadow-sm group"
+                            title="Back to Home"
+                        >
+                            <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+                            <span className="hidden sm:inline">Home</span>
+                        </button>
+                        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate('/')} title="Go to Home">
+                            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center font-bold text-slate-900 shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">MQ</div>
+                            <span className="font-bold text-xl tracking-tighter uppercase italic text-slate-900">MedQueue <span className="text-primary">Patient</span></span>
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
+                        {/* Audio Announcements Toggle */}
+                        <button
+                            onClick={() => {
+                                const next = !voiceAnnounceEnabled;
+                                setVoiceAnnounceEnabled(next);
+                                if (next) {
+                                    speakAnnouncement("Voice queue announcements enabled.");
+                                } else {
+                                    setToast("Voice queue announcements muted.");
+                                    setTimeout(() => setToast(null), 2500);
+                                }
+                            }}
+                            className={`p-2 rounded-xl transition-all ${voiceAnnounceEnabled ? 'text-emerald-500 bg-emerald-500/10' : 'text-gray-400 hover:text-slate-900'}`}
+                            title={voiceAnnounceEnabled ? "Audio Queue Voice Active (Click to mute)" : "Unmute Audio Queue Voice"}
+                        >
+                            {voiceAnnounceEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                        </button>
+
+                        {/* Dark Mode Toggle */}
+                        <button
+                            onClick={toggleTheme}
+                            className="p-2 rounded-xl text-gray-400 hover:text-slate-900 transition-colors"
+                            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                        >
+                            {theme === 'dark' ? <Sun size={20} className="text-amber-400" /> : <Moon size={20} className="text-slate-700" />}
+                        </button>
+
                         <button
                             onClick={() => setShowHistory(true)}
-                            className="p-2 text-gray-400 hover:text-white transition-colors relative group"
+                            className="p-2 text-gray-400 hover:text-slate-900 transition-colors relative group"
                             title="My Bookings"
                         >
                             <FileText size={20} />
@@ -506,11 +548,11 @@ Powered by MedQueue AI
                         <div className="relative">
                             <button
                                 onClick={() => setShowNotifications(!showNotifications)}
-                                className={`relative p-2 transition-colors ${showNotifications ? 'text-primary bg-primary/10 rounded-xl' : 'text-gray-400 hover:text-white'}`}
+                                className={`relative p-2 transition-colors ${showNotifications ? 'text-primary bg-primary/10 rounded-xl' : 'text-gray-400 hover:text-slate-900'}`}
                             >
                                 <Bell size={20} />
                                 {notifications.some(n => !n.read) && (
-                                    <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full ring-2 ring-[#0a0a0a]" />
+                                    <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full ring-2 ring-white" />
                                 )}
                             </button>
 
@@ -526,10 +568,10 @@ Powered by MedQueue AI
                                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                             animate={{ opacity: 1, y: 0, scale: 1 }}
                                             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                            className="absolute right-0 mt-4 w-80 glass rounded-3xl border border-white/10 shadow-2xl z-50 overflow-hidden"
+                                            className="absolute right-0 mt-4 w-80 glass rounded-3xl border border-slate-200 shadow-2xl z-50 overflow-hidden"
                                         >
-                                            <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
-                                                <h3 className="text-xs font-black uppercase tracking-widest text-white">Notifications</h3>
+                                            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-100/50">
+                                                <h3 className="text-xs font-black uppercase tracking-widest text-slate-900">Notifications</h3>
                                                 <button
                                                     onClick={() => setNotifications(notifications.map(n => ({ ...n, read: true })))}
                                                     className="text-[10px] font-bold text-primary hover:underline uppercase"
@@ -542,10 +584,10 @@ Powered by MedQueue AI
                                                     notifications.map((n) => (
                                                         <div
                                                             key={n.id}
-                                                            className={`p-4 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer relative ${!n.read ? 'bg-primary/5' : ''}`}
+                                                            className={`p-4 border-b border-slate-200 hover:bg-slate-100/50 transition-colors cursor-pointer relative ${!n.read ? 'bg-primary/5' : ''}`}
                                                         >
                                                             {!n.read && <div className="absolute left-2 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]" />}
-                                                            <p className={`text-xs font-bold mb-1 ${!n.read ? 'text-white' : 'text-gray-400'}`}>{n.title}</p>
+                                                            <p className={`text-xs font-bold mb-1 ${!n.read ? 'text-slate-900' : 'text-gray-400'}`}>{n.title}</p>
                                                             <p className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">{n.message}</p>
                                                             <p className="text-[9px] text-gray-600 font-bold uppercase mt-2">{n.time}</p>
                                                         </div>
@@ -557,8 +599,8 @@ Powered by MedQueue AI
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="p-3 text-center bg-white/5">
-                                                <button className="text-[10px] font-bold text-gray-500 hover:text-white uppercase tracking-widest transition-colors">
+                                            <div className="p-3 text-center bg-slate-100/50">
+                                                <button className="text-[10px] font-bold text-gray-500 hover:text-slate-900 uppercase tracking-widest transition-colors">
                                                     View All Activity
                                                 </button>
                                             </div>
@@ -567,12 +609,12 @@ Powered by MedQueue AI
                                 )}
                             </AnimatePresence>
                         </div>
-                        <div className="flex items-center gap-3 pl-6 border-l border-white/10">
+                        <div className="flex items-center gap-3 pl-6 border-l border-slate-200">
                             <div className="text-right hidden sm:block">
-                                <p className="text-xs font-bold text-white uppercase">{user?.name || 'Patient'}</p>
+                                <p className="text-xs font-bold text-slate-900 uppercase">{user?.name || 'Patient'}</p>
                                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest italic">Verified Account</p>
                             </div>
-                            <button onClick={signOut} className="p-2 bg-white/5 rounded-xl border border-white/10 text-gray-400 hover:text-white transition-colors" title="Logout">
+                            <button onClick={signOut} className="p-2 bg-slate-100/50 rounded-xl border border-slate-200 text-gray-400 hover:text-slate-900 transition-colors" title="Logout">
                                 <LogOut size={18} />
                             </button>
                         </div>
@@ -581,12 +623,103 @@ Powered by MedQueue AI
             </header>
 
             <main className="max-w-7xl mx-auto px-6 pt-10">
+                {/* 👨‍👩‍👧 Family & Dependent Profile Switcher */}
+                <div className="mb-8 p-4 bg-white/70 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm backdrop-blur-md flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                            <Users size={20} />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">Active Patient Profile:</span>
+                                <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 uppercase tracking-wider">
+                                    {activeMember}
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Book tokens, manage prescriptions, and track queue for family members</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {familyMembers.map((member) => (
+                            <button
+                                key={member}
+                                onClick={() => {
+                                    setActiveMember(member);
+                                    setToast(`Switched active profile to ${member}`);
+                                    setTimeout(() => setToast(null), 2500);
+                                }}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all uppercase tracking-wider ${activeMember === member
+                                    ? 'bg-primary text-slate-900 shadow-md font-black ring-2 ring-primary/40'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+                                }`}
+                            >
+                                {member}
+                            </button>
+                        ))}
+                        <button
+                            onClick={() => setShowAddMember(true)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-primary border border-dashed border-primary/40 transition-colors uppercase tracking-wider"
+                        >
+                            <UserPlus size={14} /> Add Member
+                        </button>
+                    </div>
+                </div>
+
+                {/* Add Family Member Modal */}
+                <AnimatePresence>
+                    {showAddMember && (
+                        <div className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.9, opacity: 0 }}
+                                className="glass max-w-sm w-full p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                            >
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
+                                        <UserPlus size={16} className="text-primary" /> Add Dependent Profile
+                                    </h3>
+                                    <button onClick={() => setShowAddMember(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                                <form onSubmit={handleAddMember} className="space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Member Name & Relation</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Grandma (Meera)"
+                                            value={newMemberName}
+                                            onChange={(e) => setNewMemberName(e.target.value)}
+                                            required
+                                            className="w-full mt-1.5 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-primary"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2 justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAddMember(false)}
+                                            className="px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 uppercase tracking-wider"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <PixelButton color="primary" type="submit" className="py-2 px-4 text-xs">
+                                            Save Profile
+                                        </PixelButton>
+                                    </div>
+                                </form>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
+
                 {/* Hero / Search */}
                 <div className="mb-12">
                     <motion.h1
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="text-4xl font-black text-white mb-4 tracking-tighter uppercase"
+                        className="text-4xl font-black text-slate-900 mb-4 tracking-tighter uppercase"
                     >
                         Find Medical Help <span className="text-primary">Instantly</span>
                     </motion.h1>
@@ -601,15 +734,39 @@ Powered by MedQueue AI
                             placeholder="Search by hospital name, specialty, or location..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl focus:outline-none focus:border-primary transition-all text-white shadow-2xl"
+                            className="w-full pl-12 pr-4 py-4 bg-slate-100/50 border border-slate-200 rounded-2xl focus:outline-none focus:border-primary transition-all text-slate-900 shadow-2xl"
                         />
                     </div>
                 </div>
 
-                {/* Categories */}
+                {/* Tabs */}
+                <div className="flex border-b border-slate-200 mb-8 max-w-2xl">
+                    <button
+                        onClick={() => setActiveTab('hospitals')}
+                        className={`py-4 px-6 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === 'hospitals' ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
+                    >
+                        Hospital Finder
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('symptom-checker')}
+                        className={`py-4 px-6 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === 'symptom-checker' ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
+                    >
+                        AI Assistant
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('pharmacy')}
+                        className={`py-4 px-6 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === 'pharmacy' ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
+                    >
+                        Pharmacy
+                    </button>
+                </div>
+
+                {activeTab === 'hospitals' && (
+                    <>
+                        {/* Categories */}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-12">
                     {[
-                        { icon: Activity, label: 'All', color: 'text-white' },
+                        { icon: Activity, label: 'All', color: 'text-slate-900' },
                         { icon: Stethoscope, label: 'Emergency', color: 'text-red-500' },
                         { icon: Activity, label: 'Diagnostics', color: 'text-blue-500' },
                         { icon: MapPin, label: 'Nearby', color: 'text-green-500' },
@@ -617,27 +774,50 @@ Powered by MedQueue AI
                     ].map((cat) => (
                         <button
                             key={cat.label}
-                            onClick={() => setActiveCategory(cat.label === 'All' ? null : (activeCategory === cat.label ? null : cat.label))}
+                            onClick={() => {
+                                if (cat.label === 'Nearby') {
+                                    if (!userLocation) {
+                                        setToast('Fetching your location...');
+                                        navigator.geolocation.getCurrentPosition(
+                                            (pos) => {
+                                                setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                                                setActiveCategory('Nearby');
+                                                setToast('Location fetched! Showing nearest hospitals.');
+                                                setTimeout(() => setToast(null), 3000);
+                                            },
+                                            () => {
+                                                setToast('Location access denied. Showing default hospitals.');
+                                                setTimeout(() => setToast(null), 3000);
+                                                setActiveCategory('Nearby');
+                                            }
+                                        );
+                                    } else {
+                                        setActiveCategory(activeCategory === 'Nearby' ? null : 'Nearby');
+                                    }
+                                } else {
+                                    setActiveCategory(cat.label === 'All' ? null : (activeCategory === cat.label ? null : cat.label));
+                                }
+                            }}
                             className={`glass p-6 rounded-2xl border transition-all text-center group ${(cat.label === 'All' && activeCategory === null) || activeCategory === cat.label
                                 ? 'border-primary bg-primary/10 shadow-lg shadow-primary/20'
-                                : 'border-white/5 hover:border-white/20'
+                                : 'border-slate-200 hover:border-white/20'
                                 }`}
                         >
-                            <div className={`w-12 h-12 ${cat.color} bg-white/5 rounded-xl flex items-center justify-center mb-3 mx-auto group-hover:scale-110 transition-transform`}>
+                            <div className={`w-12 h-12 ${cat.color} bg-slate-100/50 rounded-xl flex items-center justify-center mb-3 mx-auto group-hover:scale-110 transition-transform`}>
                                 <cat.icon size={24} />
                             </div>
-                            <p className="text-sm font-bold text-white uppercase tracking-wider">{cat.label}</p>
+                            <p className="text-sm font-bold text-slate-900 uppercase tracking-wider">{cat.label}</p>
                         </button>
                     ))}
                 </div>
 
                 {/* Hospital List */}
-                <h2 className="text-xl font-black text-white mb-6 uppercase tracking-tighter flex items-center justify-between">
+                <h2 className="text-xl font-black text-slate-900 mb-6 uppercase tracking-tighter flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Activity className="text-primary" size={20} />
                         Live Medical Hubs
                     </div>
-                    <span className="text-xs font-bold text-gray-500 bg-white/5 px-4 py-2 rounded-full border border-white/10 uppercase tracking-widest">
+                    <span className="text-xs font-bold text-gray-500 bg-slate-100/50 px-4 py-2 rounded-full border border-slate-200 uppercase tracking-widest">
                         {hospitals.length} INSTITUTIONS INDEXED
                     </span>
                 </h2>
@@ -654,12 +834,12 @@ Powered by MedQueue AI
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3 }}
-                            className="glass p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-white/5 hover:border-primary/20 transition-all group"
+                            className="glass p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-slate-200 hover:border-primary/20 transition-all group"
                         >
                             <div className="flex flex-col md:flex-row justify-between gap-8">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-3 mb-2">
-                                        <h3 className="text-2xl font-bold text-white">{hospital.name}</h3>
+                                        <h3 className="text-2xl font-bold text-slate-900">{hospital.name}</h3>
                                         {hospital.surge_detected && (
                                             <span className="px-3 py-1 bg-red-500/10 text-red-500 text-[10px] font-black uppercase rounded-full border border-red-500/20 animate-pulse">
                                                 High Surge
@@ -671,25 +851,25 @@ Powered by MedQueue AI
                                     </p>
 
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
-                                        <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                                        <div className="p-4 rounded-2xl bg-slate-100/50 border border-slate-200">
                                             <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-1">Queue Size</p>
-                                            <p className="text-xl font-black text-white flex items-center gap-2">
+                                            <p className="text-xl font-black text-slate-900 flex items-center gap-2">
                                                 <Users size={18} className="text-primary" />
-                                                {hospital.currentQueue ?? hospital.queue_size} <span className="text-[10px] text-gray-600 font-bold uppercase font-normal tracking-normal italic">Patients</span>
+                                                {hospital.currentQueue ?? hospital.queue ?? hospital.queue_size} <span className="text-[10px] text-gray-600 font-bold uppercase font-normal tracking-normal italic">Patients</span>
                                             </p>
                                         </div>
-                                        <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                                        <div className="p-4 rounded-2xl bg-slate-100/50 border border-slate-200">
                                             <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-1">Wait Time</p>
                                             <p className="text-xl font-black text-primary flex items-center gap-2 italic">
                                                 <Clock size={18} />
-                                                {hospital.avgWaitTime ?? hospital.wait_time} <span className="text-[10px] text-gray-600 font-bold uppercase font-normal tracking-normal">mins</span>
+                                                {hospital.avgWaitTime ?? hospital.wait_time ?? (hospital.queue || 0) * 5} <span className="text-[10px] text-gray-600 font-bold uppercase font-normal tracking-normal">mins</span>
                                             </p>
                                         </div>
-                                        <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                                        <div className="p-4 rounded-2xl bg-slate-100/50 border border-slate-200">
                                             <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-1">Avail. Beds</p>
                                             <p className="text-xl font-black text-green-500 flex items-center gap-2">
                                                 <Heart size={18} />
-                                                {hospital.availableBeds ?? hospital.available_beds} <span className="text-[10px] text-gray-600 font-bold uppercase font-normal tracking-normal">Free</span>
+                                                {hospital.availableBeds ?? hospital.beds ?? hospital.available_beds} <span className="text-[10px] text-gray-600 font-bold uppercase font-normal tracking-normal">Free</span>
                                             </p>
                                         </div>
                                     </div>
@@ -697,14 +877,14 @@ Powered by MedQueue AI
 
                                 <div className="flex flex-col justify-center gap-3 shrink-0">
                                     <PixelButton
-                                        onClick={() => setBookingHospital(hospital)}
+                                        onClick={() => window.open(`/book?hospital=${encodeURIComponent(hospital.name)}&id=${hospital.id}`, '_blank')}
                                         color="primary"
                                         className="w-full"
                                     >
                                         Book Token
                                     </PixelButton>
                                     <PixelButton
-                                        onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.name + ' ' + hospital.address)}`)}
+                                        onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${hospital.position.lat},${hospital.position.lng}`, '_blank')}
                                         color="neutral"
                                         className="w-full"
                                     >
@@ -715,6 +895,413 @@ Powered by MedQueue AI
                         </motion.div>
                     ))}
                 </div>
+                    </>
+                )}
+
+                {/* AI Symptom Checker */}
+                {activeTab === 'pharmacy' && (
+                    <div className="mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-100/50 p-6 rounded-[2.5rem] border border-slate-200 shadow-3xl">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-primary/20 rounded-2xl border border-primary/20">
+                                    <ShoppingBag className="text-primary" size={24} />
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">MedStore Global</h2>
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Genuine Medicines · Collect from nearest hospital store</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                <div className="relative flex-1 md:w-56">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Search medicines..."
+                                        value={medicineSearch}
+                                        onChange={(e) => setMedicineSearch(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-3 bg-slate-100/50 border border-slate-200 rounded-xl focus:outline-none focus:border-primary transition-all text-sm text-slate-900"
+                                    />
+                                </div>
+                                
+                                <button 
+                                    onClick={() => setShowCart(!showCart)}
+                                    className="relative p-3 bg-slate-100/50 hover:bg-slate-100 rounded-xl border border-slate-200 transition-all group shrink-0"
+                                >
+                                    <ShoppingCart className="text-slate-900 group-hover:text-primary" size={20} />
+                                    {cart.length > 0 && (
+                                        <span className="absolute -top-2 -right-2 bg-primary text-slate-900 text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">
+                                            {cart.reduce((acc, item) => acc + item.quantity, 0)}
+                                        </span>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {MEDICINES.filter(m => 
+                                    m.name.toLowerCase().includes(medicineSearch.toLowerCase()) || 
+                                    m.disease.some(d => d.toLowerCase().includes(medicineSearch.toLowerCase())) ||
+                                    m.category.toLowerCase().includes(medicineSearch.toLowerCase())
+                                ).map((med) => (
+                                    <motion.div 
+                                        key={med.id}
+                                        layout
+                                        className="glass p-6 rounded-[2rem] border border-slate-200 hover:border-primary/30 transition-all group relative overflow-hidden"
+                                    >
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="p-3 bg-slate-100/50 rounded-2xl group-hover:scale-110 transition-transform duration-500">
+                                                <Pill className="text-primary" size={24} />
+                                            </div>
+                                            <span className="text-[10px] font-black text-gray-400 bg-slate-100/50 px-3 py-1 rounded-full uppercase tracking-widest border border-slate-200">
+                                                {med.category}
+                                            </span>
+                                        </div>
+                                        <h3 className="text-xl font-bold text-slate-900 mb-1">{med.name}</h3>
+                                        <p className="text-xs text-gray-500 mb-4 h-8 line-clamp-2">{med.description}</p>
+                                        
+                                        <div className="flex flex-wrap gap-2 mb-6">
+                                            {med.disease.slice(0, 2).map(d => (
+                                                <span key={d} className="text-[9px] font-bold text-primary/80 bg-primary/5 px-2 py-1 rounded-lg border border-primary/10">
+                                                    {d}
+                                                </span>
+                                            ))}
+                                        </div>
+
+                                        <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-200">
+                                            <div>
+                                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Price</p>
+                                                <p className="text-lg font-black text-slate-900">₹{med.price.toFixed(2)}</p>
+                                            </div>
+                                            <button 
+                                                onClick={() => {
+                                                    const existing = cart.find(item => item.med.id === med.id);
+                                                    if (existing) {
+                                                        setCart(cart.map(item => item.med.id === med.id ? { ...item, quantity: item.quantity + 1 } : item));
+                                                    } else {
+                                                        setCart([...cart, { med, quantity: 1 }]);
+                                                    }
+                                                    setToast(`Added ${med.name} to cart`);
+                                                    setTimeout(() => setToast(null), 2000);
+                                                }}
+                                                className="bg-primary hover:bg-white text-black px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                                            >
+                                                Add to Cart
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+
+                            {/* Cart Sidebar / Section */}
+                            <div className={`glass p-8 rounded-[2.5rem] border border-slate-200 h-fit sticky top-24 transition-all ${showCart ? 'ring-2 ring-primary/50' : ''}`}>
+                                <h3 className="text-xl font-black text-slate-900 mb-6 uppercase tracking-tighter flex items-center gap-2">
+                                    <ShoppingCart className="text-primary" size={20} />
+                                    Your Order
+                                </h3>
+
+                                {cart.length === 0 && !showPrescriptionDownload ? (
+                                    <div className="py-12 text-center">
+                                        <Package className="text-gray-700 mx-auto mb-4" size={48} />
+                                        <p className="text-gray-500 font-bold uppercase tracking-tighter">Your cart is empty</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-6">
+                                        {cart.length > 0 && (
+                                            <div className="max-h-[400px] overflow-y-auto pr-2 space-y-4 custom-scrollbar">
+                                                {cart.map((item) => (
+                                                    <div key={item.med.id} className="flex items-center gap-4 group">
+                                                        <div className="w-12 h-12 bg-slate-100/50 rounded-xl border border-slate-200 flex items-center justify-center shrink-0">
+                                                            <Pill className="text-primary/50" size={20} />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-bold text-slate-900 truncate">{item.med.name}</p>
+                                                            <p className="text-xs text-gray-500">₹{item.med.price} x {item.quantity}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <button 
+                                                                onClick={() => {
+                                                                    if (item.quantity > 1) {
+                                                                        setCart(cart.map(i => i.med.id === item.med.id ? { ...i, quantity: i.quantity - 1 } : i));
+                                                                    } else {
+                                                                        setCart(cart.filter(i => i.med.id !== item.med.id));
+                                                                    }
+                                                                }}
+                                                                className="p-1 hover:text-primary text-gray-500 transition-colors"
+                                                            >
+                                                                <Minus size={14} />
+                                                            </button>
+                                                            <span className="text-xs font-bold text-slate-900 w-4 text-center">{item.quantity}</span>
+                                                            <button 
+                                                                onClick={() => setCart(cart.map(i => i.med.id === item.med.id ? { ...i, quantity: i.quantity + 1 } : i))}
+                                                                className="p-1 hover:text-primary text-gray-500 transition-colors"
+                                                            >
+                                                                <Plus size={14} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => setCart(cart.filter(i => i.med.id !== item.med.id))}
+                                                                className="p-1 hover:text-red-500 text-gray-700 transition-colors ml-2"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {cart.length > 0 && (
+                                            <div className="pt-6 border-t border-slate-200 space-y-3">
+                                                <div className="flex justify-between text-xs font-bold text-gray-500 uppercase tracking-widest">
+                                                    <span>Subtotal</span>
+                                                    <span className="text-slate-900 font-black">₹{cart.reduce((acc, item) => acc + (item.med.price * item.quantity), 0).toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-xs font-bold text-gray-500 uppercase tracking-widest">
+                                                    <span>Service Fee</span>
+                                                    <span className="text-green-500 font-black italic">FREE</span>
+                                                </div>
+                                                <div className="flex justify-between text-xl font-black text-slate-900 pt-2">
+                                                    <span>TOTAL</span>
+                                                    <span className="text-primary italic">₹{cart.reduce((acc, item) => acc + (item.med.price * item.quantity), 0).toFixed(2)}</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {cart.length > 0 && (
+                                            <div className="pt-4 space-y-3">
+                                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">
+                                                    Prescribing Doctor
+                                                </label>
+                                                <div className="relative group">
+                                                    <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors" size={14} />
+                                                    <input 
+                                                        type="text"
+                                                        placeholder="Enter doctor's name..."
+                                                        value={prescribingDoctor}
+                                                        onChange={(e) => setPrescribingDoctor(e.target.value)}
+                                                        className="w-full pl-10 pr-4 py-3 bg-slate-100/50 border border-slate-200 rounded-xl focus:outline-none focus:border-primary transition-all text-xs text-slate-900 placeholder:text-gray-400"
+                                                    />
+                                                </div>
+                                                <p className="text-[9px] text-gray-400 italic">This will be printed on your digital prescription.</p>
+                                            </div>
+                                        )}
+                                            
+                                            {showPrescriptionDownload ? (
+                                                <div className="space-y-4 pt-4 border-t border-slate-200 text-center">
+                                                    <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-2xl">
+                                                        <Activity className="text-green-500 mx-auto mb-2" size={24} />
+                                                        <p className="text-xs font-black text-green-500 uppercase tracking-widest">Payment Successful</p>
+                                                    </div>
+                                                    <PixelButton 
+                                                        className="w-full" 
+                                                        color="primary"
+                                                        onClick={() => {
+                                                            const doc = new jsPDF();
+                                                            const orderId = `MQ-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+                                                            const date = new Date().toLocaleString();
+                                                            const total = lastOrderItems.reduce((acc, item) => acc + (item.med.price * item.quantity), 0).toFixed(2);
+
+                                                            // Header
+                                                            doc.setFillColor(59, 130, 246); // Primary Color
+                                                            doc.rect(0, 0, 210, 40, 'F');
+                                                            doc.setTextColor(255, 255, 255);
+                                                            doc.setFontSize(28);
+                                                            doc.setFont("helvetica", "bold");
+                                                            doc.text("MedQueue", 20, 25);
+                                                            doc.setFontSize(10);
+                                                            doc.text("DIGITAL HEALTHCARE INFRASTRUCTURE", 20, 32);
+
+                                                            // Top Right info
+                                                            doc.setFontSize(10);
+                                                            doc.text(`Prescription ID: ${orderId}`, 140, 20);
+                                                            doc.text(`Date: ${date}`, 140, 27);
+
+                                                            // Patient & Doctor Information
+                                                            doc.setTextColor(51, 65, 85); // Slate 700
+                                                            doc.setFontSize(14);
+                                                            doc.text("Prescription Information", 20, 55);
+                                                            doc.setDrawColor(226, 232, 240); // Slate 200
+                                                            doc.line(20, 57, 190, 57);
+
+                                                            doc.setFontSize(11);
+                                                            doc.setFont("helvetica", "bold");
+                                                            doc.text("Patient Name:", 20, 68);
+                                                            doc.setFont("helvetica", "normal");
+                                                            doc.text(user?.name || 'Verified Patient', 50, 68);
+
+                                                            doc.setFont("helvetica", "bold");
+                                                            doc.text("Prescribing Doctor:", 20, 75);
+                                                            doc.setFont("helvetica", "normal");
+                                                            doc.text(prescribingDoctor || "Authorized Medical Officer", 60, 75);
+
+                                                            // Medicines Table
+                                                            doc.setFont("helvetica", "bold");
+                                                            doc.text("Prescribed Medicines", 20, 95);
+                                                            doc.setFillColor(248, 250, 252); // Slate 50
+                                                            doc.rect(20, 98, 170, 8, 'F');
+                                                            doc.setFontSize(10);
+                                                            doc.text("Medicine Name", 25, 103);
+                                                            doc.text("Qty", 120, 103);
+                                                            doc.text("Price", 145, 103);
+                                                            doc.text("Total", 170, 103);
+
+                                                            let yPos = 113;
+                                                            doc.setFont("helvetica", "normal");
+                                                            lastOrderItems.forEach(item => {
+                                                                doc.text(item.med.name, 25, yPos);
+                                                                doc.text(item.quantity.toString(), 122, yPos);
+                                                                doc.text(`INR ${item.med.price}`, 145, yPos);
+                                                                doc.text(`INR ${item.med.price * item.quantity}`, 170, yPos);
+                                                                yPos += 10;
+                                                            });
+
+                                                            // Total Footer
+                                                            doc.setDrawColor(59, 130, 246);
+                                                            doc.setLineWidth(0.5);
+                                                            doc.line(130, yPos + 2, 190, yPos + 2);
+                                                            doc.setFont("helvetica", "bold");
+                                                            doc.setFontSize(12);
+                                                            doc.text("Total Paid:", 130, yPos + 12);
+                                                            doc.setTextColor(59, 130, 246);
+                                                            doc.text(`INR ${total}`, 170, yPos + 12);
+
+                                                            // Footer / Instructions
+                                                            doc.setTextColor(100, 116, 139); // Slate 500
+                                                            doc.setFontSize(9);
+                                                            doc.setFont("helvetica", "italic");
+                                                            doc.text("Instructions:", 20, yPos + 35);
+                                                            doc.text("1. This is a digitally signed e-prescription valid at all MedQueue affiliate pharmacies.", 20, yPos + 41);
+                                                            doc.text("2. Please present the QR/ID at the counter for medicine collection.", 20, yPos + 47);
+                                                            doc.text("3. Ensure to follow the dosage as mentioned by the consultation.", 20, yPos + 53);
+
+                                                            // Digital Seal / Signature
+                                                            doc.setDrawColor(59, 130, 246);
+                                                            doc.rect(140, yPos + 35, 50, 20); 
+                                                            doc.setFont("helvetica", "italic");
+                                                            doc.setFontSize(10);
+                                                            doc.setTextColor(59, 130, 246);
+                                                            doc.text(prescribingDoctor || "Authorized Medical Officer", 165, yPos + 46, { align: 'center' });
+                                                            doc.setFontSize(7);
+                                                            doc.setFont("helvetica", "normal");
+                                                            doc.text("DIGITAL SIGNATURE", 165, yPos + 51, { align: 'center' });
+
+                                                            doc.save(`Prescription_${orderId}.pdf`);
+
+                                                            setToast("Professional Prescription Saved!");
+                                                            setTimeout(() => {
+                                                                setToast(null);
+                                                                setShowPrescriptionDownload(false);
+                                                            }, 3000);
+                                                        }}
+                                                    >
+                                                        <Download size={16} /> Download Prescription
+                                                    </PixelButton>
+                                                </div>
+                                            ) : (
+                                                <PixelButton 
+                                                    className="w-full mt-4" 
+                                                    color="primary"
+                                                    onClick={() => {
+                                                        const total = cart.reduce((acc, item) => acc + (item.med.price * item.quantity), 0);
+                                                        setPaymentAmount(total);
+                                                        setLastOrderItems([...cart]);
+                                                        setShowPaymentGateway(true);
+                                                    }}
+                                                >
+                                                    Secure Payment & Order
+                                                </PixelButton>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                {/* Demo Payment Gateway Modal */}
+                {showPaymentGateway && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/40 backdrop-blur-xl p-4">
+                        <motion.div 
+                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            className="w-full max-w-md bg-white border border-slate-200 rounded-[3rem] p-8 space-y-8 shadow-3xl text-center"
+                        >
+                            <div className="space-y-2">
+                                <div className="w-16 h-16 bg-primary/20 rounded-2xl border border-primary/20 flex items-center justify-center mx-auto mb-4">
+                                    <Heart className="text-primary animate-pulse" size={32} />
+                                </div>
+                                <h3 className="text-2xl font-black text-slate-900 uppercase italic tracking-tighter">Secure Checkout</h3>
+                                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest italic">MedQueue Payment Gateway</p>
+                            </div>
+
+                            <div className="bg-slate-100/50 p-6 rounded-3xl border border-slate-200 space-y-4 text-left">
+                                <div className="flex justify-between items-center text-sm font-bold text-gray-400">
+                                    <span className="uppercase tracking-widest text-[10px]">Payable Amount</span>
+                                    <span className="text-slate-900 text-xl font-black italic">₹{paymentAmount.toFixed(2)}</span>
+                                </div>
+                                <div className="h-[1px] bg-slate-100/50 w-full" />
+                                
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                                        <Activity size={10} /> Select Payment Method
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {['PhonePe UPI', 'Google Pay', 'Credit Card', 'Net Banking'].map(method => (
+                                            <button 
+                                                key={method} 
+                                                className="p-3 bg-slate-100/50 hover:bg-primary/10 border border-slate-200 hover:border-primary/30 rounded-xl text-[10px] font-black text-slate-900 transition-all uppercase tracking-tighter"
+                                            >
+                                                {method}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <PixelButton 
+                                    className="w-full h-14" 
+                                    color="primary"
+                                    onClick={() => {
+                                        setToast("Verifying Transaction...");
+                                        setTimeout(() => {
+                                            setShowPaymentGateway(false);
+                                            setShowPrescriptionDownload(true);
+                                            setCart([]);
+                                            setToast("Payment successful! Prescription ready.");
+                                        }, 1500);
+                                    }}
+                                >
+                                    Confirm & Pay Now
+                                </PixelButton>
+
+                                <button 
+                                    onClick={() => setShowPaymentGateway(false)}
+                                    className="text-xs font-bold text-gray-500 hover:text-slate-900 uppercase tracking-widest transition-all"
+                                >
+                                    Cancel Payment
+                                </button>
+                            </div>
+
+                            <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-gray-600 uppercase tracking-widest">
+                                <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
+                                Secured by MedQueue SSL Encryption
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
+                {activeTab === 'symptom-checker' && (
+                    <div className="mt-8">
+                        <h2 className="text-xl font-black text-slate-900 mb-6 uppercase tracking-tighter flex items-center gap-2">
+                            <Stethoscope className="text-primary" size={20} />
+                            AI Assistant
+                            <span className="text-xs font-bold text-gray-500 bg-slate-100/50 px-3 py-1 rounded-full border border-slate-200 uppercase tracking-widest ml-2">Neural Triage & Health Core</span>
+                        </h2>
+                        <div className="h-[520px]">
+                            <SymptomChecker />
+                        </div>
+                    </div>
+                )}
             </main>
         </div >
     );

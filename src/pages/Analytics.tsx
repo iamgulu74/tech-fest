@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, TrendingUp, Users, Clock, ArrowLeft, Star } from 'lucide-react';
+import { BarChart3, TrendingUp, Users, Clock, ArrowLeft, Star, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { fetchHospitalDetails } from '../lib/api';
 
@@ -43,51 +43,53 @@ const Analytics = () => {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-black via-[#0a0a0a] to-black text-white p-8">
+        <div className="min-h-screen bg-[#f8fafc] text-slate-900 p-8 md:p-12 font-sans selection:bg-primary/20">
             {/* Header */}
-            <div className="max-w-7xl mx-auto mb-8">
+            <div className="max-w-7xl mx-auto mb-14">
                 <button
                     onClick={() => navigate('/medqueue')}
-                    className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-6"
+                    className="flex items-center gap-3 text-slate-400 hover:text-slate-900 transition-all mb-8 text-[10px] font-black uppercase tracking-widest py-2 px-4 border border-slate-200 rounded-full bg-white/50 backdrop-blur-md shadow-sm w-fit"
                 >
-                    <ArrowLeft size={20} />
+                    <ArrowLeft size={16} />
                     Back to Queue
                 </button>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
-                        <h1 className="text-4xl font-black mb-2">Hospital Analytics</h1>
-                        <p className="text-gray-400">Performance metrics and insights</p>
+                        <h1 className="text-4xl lg:text-5xl font-black text-slate-900 mb-2 uppercase tracking-tighter italic">Hospital Analytics</h1>
+                        <p className="text-slate-400 font-bold text-sm tracking-tight italic">Performance metrics and patient insights</p>
                     </div>
-                    <div className="flex items-center gap-3 px-2 text-primary font-black">
-                        <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center font-bold text-white shadow-lg shadow-primary/20">MQ</div>
-                        <span className="font-bold text-xl tracking-tight uppercase italic">MedQueue</span>
+                    <div className="flex items-center gap-4 py-4 px-6 bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50">
+                        <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center font-black text-white shadow-xl shadow-primary/20">MQ</div>
+                        <span className="font-black text-xl tracking-tighter uppercase italic text-slate-900">MedQueue</span>
                     </div>
                 </div>
             </div>
 
             {loading ? (
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-gray-500">Loading analytics data...</div>
+                <div className="flex flex-col items-center justify-center h-96 gap-6">
+                    <div className="w-16 h-16 bg-primary/10 rounded-3xl flex items-center justify-center border border-primary/20 shadow-inner">
+                        <Activity size={32} className="animate-pulse text-primary" />
+                    </div>
+                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">Processing Metadata...</p>
                 </div>
             ) : (
-                <div className="max-w-7xl mx-auto space-y-8">
+                <div className="max-w-7xl mx-auto space-y-12">
                     {/* Key Metrics */}
-                    <div className="grid md:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="glass p-6 rounded-3xl border border-white/10"
+                            className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden group hover:border-blue-500/20 transition-all"
                         >
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="w-12 h-12 bg-blue-500/20 rounded-2xl flex items-center justify-center">
-                                    <Clock className="text-blue-400" size={24} />
-                                </div>
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-full blur-3xl -mr-12 -mt-12 group-hover:bg-blue-500/5 transition-colors" />
+                            <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 border border-blue-100">
+                                <Clock className="text-blue-600" size={28} />
                             </div>
-                            <h3 className="text-3xl font-black mb-2">{data?.metrics.avgWaitTime} min</h3>
-                            <p className="text-sm text-gray-400 font-semibold">Avg Wait Time</p>
-                            <div className="mt-2 flex items-center gap-1 text-xs text-green-400">
+                            <h3 className="text-4xl font-black text-slate-900 tracking-tighter italic mb-1">{data?.metrics.avgWaitTime}m</h3>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Avg Wait Time</p>
+                            <div className="mt-4 flex items-center gap-1 text-[10px] text-green-600 font-black">
                                 <TrendingUp size={12} />
-                                <span>15% improvement</span>
+                                <span className="uppercase tracking-widest">15% improvement</span>
                             </div>
                         </motion.div>
 
@@ -95,18 +97,17 @@ const Analytics = () => {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.1 }}
-                            className="glass p-6 rounded-3xl border border-white/10"
+                            className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden group hover:border-green-500/20 transition-all"
                         >
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="w-12 h-12 bg-green-500/20 rounded-2xl flex items-center justify-center">
-                                    <Users className="text-green-400" size={24} />
-                                </div>
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-green-50/50 rounded-full blur-3xl -mr-12 -mt-12 group-hover:bg-green-500/5 transition-colors" />
+                            <div className="w-14 h-14 bg-green-50 rounded-2xl flex items-center justify-center mb-6 border border-green-100">
+                                <Users className="text-green-600" size={28} />
                             </div>
-                            <h3 className="text-3xl font-black mb-2">{data?.metrics.dailyPatients}</h3>
-                            <p className="text-sm text-gray-400 font-semibold">Daily Patients</p>
-                            <div className="mt-2 flex items-center gap-1 text-xs text-green-400">
+                            <h3 className="text-4xl font-black text-slate-900 tracking-tighter italic mb-1">{data?.metrics.dailyPatients}</h3>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Daily Patients</p>
+                            <div className="mt-4 flex items-center gap-1 text-[10px] text-green-600 font-black">
                                 <TrendingUp size={12} />
-                                <span>8% increase</span>
+                                <span className="uppercase tracking-widest">8% growth</span>
                             </div>
                         </motion.div>
 
@@ -114,115 +115,115 @@ const Analytics = () => {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.2 }}
-                            className="glass p-6 rounded-3xl border border-white/10"
+                            className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden group hover:border-purple-500/20 transition-all"
                         >
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="w-12 h-12 bg-purple-500/20 rounded-2xl flex items-center justify-center">
-                                    <BarChart3 className="text-purple-400" size={24} />
-                                </div>
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50/50 rounded-full blur-3xl -mr-12 -mt-12 group-hover:bg-purple-500/5 transition-colors" />
+                            <div className="w-14 h-14 bg-purple-50 rounded-2xl flex items-center justify-center mb-6 border border-purple-100">
+                                <BarChart3 className="text-purple-600" size={28} />
                             </div>
-                            <h3 className="text-3xl font-black mb-2">{data?.metrics.bedUtilization}%</h3>
-                            <p className="text-sm text-gray-400 font-semibold">Bed Utilization</p>
-                            <div className="mt-2 text-xs text-gray-400">
-                                Optimal range
-                            </div>
+                            <h3 className="text-4xl font-black text-slate-900 tracking-tighter italic mb-1">{data?.metrics.bedUtilization}%</h3>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Efficiency</p>
+                            <div className="mt-4 text-[10px] text-slate-400 font-black uppercase tracking-widest">Optimal range</div>
                         </motion.div>
 
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.3 }}
-                            className="glass p-6 rounded-3xl border border-white/10"
+                            className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden group hover:border-yellow-500/20 transition-all"
                         >
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="w-12 h-12 bg-yellow-500/20 rounded-2xl flex items-center justify-center">
-                                    <Star className="text-yellow-400" size={24} />
-                                </div>
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-50/50 rounded-full blur-3xl -mr-12 -mt-12 group-hover:bg-yellow-500/5 transition-colors" />
+                            <div className="w-14 h-14 bg-yellow-50 rounded-2xl flex items-center justify-center mb-6 border border-yellow-100">
+                                <Star className="text-yellow-600" size={28} />
                             </div>
-                            <h3 className="text-3xl font-black mb-2">{data?.metrics.patientSatisfaction}</h3>
-                            <p className="text-sm text-gray-400 font-semibold">Patient Satisfaction</p>
-                            <div className="mt-2 text-xs text-yellow-400">
-                                ⭐⭐⭐⭐⭐
-                            </div>
+                            <h3 className="text-4xl font-black text-slate-900 tracking-tighter italic mb-1">{data?.metrics.patientSatisfaction}</h3>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">CSAT Score</p>
+                            <div className="mt-4 text-[10px] text-yellow-600 font-black uppercase tracking-widest">High Trust</div>
                         </motion.div>
                     </div>
 
                     {/* Weekly Trend Chart */}
-                    <div className="glass rounded-3xl p-8">
-                        <h2 className="text-2xl font-bold mb-6">Weekly Patient Trend</h2>
-                        <div className="flex items-end justify-between gap-4 h-64">
+                    <div className="bg-white rounded-[3.5rem] p-10 border border-slate-100 shadow-2xl shadow-slate-200/50 overflow-hidden relative group">
+                        <div className="flex items-center gap-4 mb-14">
+                            <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic">Weekly Patient Trend</h2>
+                            <div className="h-px flex-1 bg-slate-100" />
+                        </div>
+                        <div className="flex items-end justify-between gap-4 h-72 pb-8">
                             {data?.metrics.weeklyTrend.map((count: number, i: number) => {
                                 const maxCount = Math.max(...data.metrics.weeklyTrend);
                                 const height = (count / maxCount) * 100;
 
                                 return (
-                                    <div key={i} className="flex-1 flex flex-col items-center gap-3">
-                                        <div className="text-sm font-bold text-gray-400">{count}</div>
-                                        <motion.div
-                                            initial={{ height: 0 }}
-                                            animate={{ height: `${height}%` }}
-                                            transition={{ duration: 0.5, delay: i * 0.1 }}
-                                            className="w-full bg-gradient-to-t from-primary to-blue-400 rounded-t-xl min-h-[20px]"
-                                        />
-                                        <div className="text-xs font-bold text-gray-500">{days[i]}</div>
+                                    <div key={i} className="flex-1 flex flex-col items-center gap-4 h-full">
+                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{count}</div>
+                                        <div className="flex-1 w-full flex items-end">
+                                            <motion.div
+                                                initial={{ height: 0 }}
+                                                animate={{ height: `${height}%` }}
+                                                transition={{ duration: 1, delay: i * 0.1, type: 'spring' }}
+                                                className="w-full bg-gradient-to-t from-primary/80 to-primary rounded-2xl shadow-lg shadow-primary/10 group-hover:from-primary group-hover:scale-105 transition-all"
+                                            />
+                                        </div>
+                                        <div className="text-[10px] font-black text-slate-900 uppercase tracking-widest italic">{days[i]}</div>
                                     </div>
                                 );
                             })}
                         </div>
                     </div>
 
-                    {/* Peak Hours & Current Queue */}
-                    <div className="grid md:grid-cols-2 gap-6">
-                        <div className="glass rounded-3xl p-8">
-                            <h2 className="text-xl font-bold mb-6">Peak Hours</h2>
-                            <div className="space-y-4">
+                    {/* Peak Hours & Status */}
+                    <div className="grid lg:grid-cols-2 gap-10">
+                        <div className="bg-white rounded-[3.5rem] p-10 border border-slate-100 shadow-2xl shadow-slate-200/50">
+                            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic mb-10">Traffic Density</h2>
+                            <div className="space-y-6">
                                 {data?.metrics.peakHours.map((hour: string, i: number) => (
                                     <motion.div
                                         key={i}
                                         initial={{ opacity: 0, x: -20 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: i * 0.1 }}
-                                        className="flex items-center justify-between bg-white/[0.02] p-4 rounded-xl border border-white/5"
+                                        className="flex items-center justify-between bg-slate-50 p-6 rounded-3xl border border-slate-100 hover:bg-white hover:border-primary/30 transition-all"
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
-                                                <Clock className="text-primary" size={16} />
+                                        <div className="flex items-center gap-5">
+                                            <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                                                <Clock size={20} />
                                             </div>
-                                            <span className="font-bold">{hour}</span>
+                                            <span className="text-xl font-black italic">{hour}</span>
                                         </div>
-                                        <div className="text-xs text-gray-400 font-semibold">High Traffic</div>
+                                        <div className="px-5 py-2 rounded-2xl bg-primary/5 text-primary text-[10px] font-black uppercase tracking-widest border border-primary/10">Peak Period</div>
                                     </motion.div>
                                 ))}
                             </div>
                         </div>
 
-                        <div className="glass rounded-3xl p-8">
-                            <h2 className="text-xl font-bold mb-6">Current Status</h2>
-                            <div className="space-y-6">
-                                <div className="bg-white/[0.02] p-5 rounded-xl border border-white/5">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-sm text-gray-400 font-semibold">Active Queue</span>
-                                        <span className="text-2xl font-black text-primary">{data?.currentQueue}</span>
+                        <div className="bg-white rounded-[3.5rem] p-10 border border-slate-100 shadow-2xl shadow-slate-200/50 flex flex-col">
+                            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic mb-10">Live Load Balance</h2>
+                            <div className="space-y-10 flex-1 flex flex-col justify-center">
+                                <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 hover:bg-white transition-all">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest italic">Live Queue Length</span>
+                                        <span className="text-4xl font-black text-primary italic leading-none">{data?.currentQueue}</span>
                                     </div>
-                                    <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                                    <div className="w-full h-5 bg-slate-200/50 rounded-full overflow-hidden p-1 border border-slate-200">
                                         <motion.div
                                             initial={{ width: 0 }}
-                                            animate={{ width: `${(data?.currentQueue / 10) * 100}%` }}
-                                            className="h-full bg-primary"
+                                            animate={{ width: `${(data?.currentQueue / 40) * 100}%` }}
+                                            transition={{ duration: 1.5, type: 'spring' }}
+                                            className="h-full bg-primary rounded-full shadow-lg shadow-primary/20"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="bg-white/[0.02] p-5 rounded-xl border border-white/5">
-                                    <div className="text-sm text-gray-400 font-semibold mb-3">Today's Summary</div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 hover:bg-white transition-all">
+                                    <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest italic mb-6">System Snapshot</div>
+                                    <div className="grid grid-cols-2 gap-10">
                                         <div>
-                                            <div className="text-xl font-black text-white">{data?.metrics.dailyPatients}</div>
-                                            <div className="text-xs text-gray-500">Patients Served</div>
+                                            <div className="text-2xl font-black text-slate-900 italic mb-2">{data?.metrics.dailyPatients}</div>
+                                            <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-tight">Total Daily<br />Patients</div>
                                         </div>
-                                        <div>
-                                            <div className="text-xl font-black text-secondary">{data?.metrics.avgWaitTime}m</div>
-                                            <div className="text-xs text-gray-500">Avg Wait</div>
+                                        <div className="border-l border-slate-200 pl-10">
+                                            <div className="text-2xl font-black text-secondary italic mb-2">{data?.metrics.avgWaitTime}m</div>
+                                            <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-tight">Average Response<br />Latency</div>
                                         </div>
                                     </div>
                                 </div>

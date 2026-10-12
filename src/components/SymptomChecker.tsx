@@ -1,16 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Activity, User, Bot, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { chatWithAI, sendEmergencyAlert } from '../lib/api';
-
-const systemPrompt = `You are a professional medical triage AI for MedQueue AI. 
-Your goal is to understand the user's symptoms and provide a preliminary assessment. 
-Always include a disclaimer that you are an AI and not a doctor.
-Suggest if they should visit the OPD, Emergency, or if it's likely a minor issue.
-Keep responses concise and clinical.`;
+import { checkSymptoms, sendEmergencyAlert } from '../lib/api';
 
 const SymptomChecker = () => {
     const [messages, setMessages] = useState([
-        { role: 'assistant', content: "Hello, I am your MedQueue AI Assistant. Please describe your symptoms for a preliminary triage." }
+        { role: 'assistant', content: "Hello! I'm your MedQueue AI Assistant. Please describe your symptoms or ask any health queries, and I'll identify possible conditions and recommend next steps." }
     ]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -32,8 +26,9 @@ const SymptomChecker = () => {
         setIsTyping(true);
 
         try {
-            const history = messages.map(m => ({ role: m.role, content: m.content }));
-            const response = await chatWithAI([...history, userMessage], systemPrompt);
+            const response = await checkSymptoms(input);
+            // Simulate 2 to 3 seconds of AI "thinking" time
+            await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 1000) + 2000));
             setMessages(prev => [...prev, response.message]);
         } catch (error) {
             setMessages(prev => [...prev, { role: 'assistant', content: "I'm having trouble connecting to my neural core. Please try again or consult a doctor directly." }]);
@@ -55,16 +50,16 @@ const SymptomChecker = () => {
     };
 
     return (
-        <div className="flex flex-col h-full glass rounded-3xl border-white/10 overflow-hidden shadow-2xl relative">
+        <div className="flex flex-col h-full bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-2xl relative">
             {/* Header */}
-            <div className="bg-primary/20 p-4 border-b border-white/5 flex items-center justify-between">
+            <div className="bg-primary/10 p-4 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
                         <Activity size={16} className="text-white" />
                     </div>
                     <div>
-                        <h3 className="text-xs font-bold text-white uppercase tracking-wider">Symptom Checker</h3>
-                        <p className="text-[10px] text-primary font-medium">Neural Triage v2.0</p>
+                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">AI Assistant</h3>
+                        <p className="text-[10px] text-primary font-black uppercase tracking-widest">Neural Health Core v2.0</p>
                     </div>
                 </div>
 
@@ -81,19 +76,19 @@ const SymptomChecker = () => {
             </div>
 
             {/* Chat Area */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-black/20">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-50">
                 {messages.map((m, i) => (
                     <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`flex gap-2 max-w-[85%] ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${m.role === 'user' ? 'bg-primary/20 text-primary' : 'bg-white/10 text-gray-400'
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${m.role === 'user' ? 'bg-primary/10 text-primary' : 'bg-slate-200 text-slate-500'
                                 }`}>
                                 {m.role === 'user' ? <User size={12} /> : <Bot size={12} />}
                             </div>
                             <div className={`p-3 rounded-2xl text-[11px] leading-relaxed ${m.role === 'user'
                                 ? 'bg-primary text-white rounded-tr-none shadow-lg font-bold'
                                 : m.content.includes('EMERGENCY')
-                                    ? 'bg-red-500/20 text-red-100 border border-red-500/50 rounded-tl-none font-black italic'
-                                    : 'bg-white/5 text-gray-200 rounded-tl-none border border-white/10 font-medium'
+                                    ? 'bg-red-50 text-red-600 border border-red-100 rounded-tl-none font-black italic shadow-sm'
+                                    : 'bg-white text-slate-600 rounded-tl-none border border-slate-100 font-medium shadow-sm'
                                 }`}>
                                 {m.content}
                             </div>
@@ -108,7 +103,7 @@ const SymptomChecker = () => {
             </div>
 
             {/* Input Area */}
-            <div className="p-4 bg-black/40 border-t border-white/5">
+            <div className="p-4 bg-white border-t border-slate-100">
                 <div className="relative">
                     <input
                         type="text"
@@ -116,7 +111,7 @@ const SymptomChecker = () => {
                         onChange={(e) => setInput(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && handleSend()}
                         placeholder="Describe your symptoms..."
-                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-4 pr-12 text-xs focus:border-primary outline-none transition-all placeholder:text-gray-600 font-medium text-white shadow-inner"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-4 pr-12 text-xs focus:border-primary outline-none transition-all placeholder:text-slate-300 font-bold text-slate-900 shadow-inner"
                     />
                     <button
                         onClick={handleSend}

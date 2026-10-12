@@ -1,0 +1,97 @@
+version: "2"
+type: frontend
+tech_stack:
+  - TypeScript
+  - React
+  - Vite
+  - Tailwind CSS
+  - Framer Motion
+  - Firebase (Auth, Firestore)
+  - Lucide React
+routes:
+  - path: /
+    file: src/pages/Landing.tsx
+    auth_required: false
+    description: Homepage with main services overview
+  - path: /auth
+    file: src/pages/Auth.tsx
+    auth_required: false
+    description: User type selection (Patient/Admin)
+  - path: /auth/patient
+    file: src/pages/AuthPatient.tsx
+    auth_required: false
+    description: Patient authentication portal
+  - path: /auth/admin
+    file: src/pages/AuthAdmin.tsx
+    auth_required: false
+    description: Hospital Admin authentication portal
+  - path: /pricing
+    file: src/pages/Pricing.tsx
+    auth_required: false
+    description: Subscription plans for hospitals
+  - path: /learn
+    file: src/pages/LearnHub.tsx
+    auth_required: false
+    description: Health Education Hub with internationalization
+  - path: /patient
+    file: src/pages/MedQueuePatient.tsx
+    auth_required: true
+    description: Patient dashboard for queue and medical history
+  - path: /medqueue
+    file: src/pages/MedQueueAdmin.tsx
+    auth_required: true
+    description: Admin dashboard for queue management
+  - path: /wards-beds
+    file: src/pages/WardsBeds.tsx
+    auth_required: true
+    description: Ward and bed management for hospitals
+  - path: /staffing
+    file: src/pages/Staffing.tsx
+    auth_required: true
+    description: Hospital staff management
+  - path: /analytics
+    file: src/pages/Analytics.tsx
+    auth_required: true
+    description: Hospital operational analytics
+  - path: /hospitals
+    file: src/pages/HospitalFinder.tsx
+    auth_required: true
+    description: Hospital search and booking on map
+features:
+  - name: Hospital Admin Authentication
+    description: Secure login and institution registration for admins using a separate Firebase project
+    files:
+      - src/pages/AuthAdmin.tsx
+      - src/lib/adminFirebase.ts
+    entry_route: /auth/admin
+    user_interactions:
+      - Choose to login or register
+      - Fill email, password, and hospital selection
+      - Click authentication button
+    api_calls:
+      - method: POST
+        endpoint: firebase-auth (adminApp)
+    auth_required: false
+  - name: Health Education Hub
+    description: Educational content for patients with Hindi language support
+    files:
+      - src/pages/LearnHub.tsx
+      - src/contexts/LanguageContext.tsx
+    entry_route: /learn
+    user_interactions:
+      - Toggle language between English and Hindi
+      - Scroll through health topics
+    auth_required: false
+  - name: Hospital Finder
+    description: Map-based search for libraries and hospitals with distance calculation
+    files:
+      - src/pages/HospitalFinder.tsx
+    entry_route: /hospitals
+    user_interactions:
+      - View nearby facilities on Google Maps
+      - Filter results by availability
+    auth_required: true
+known_limitations:
+  - issue: Local project must be running for tests to connect
+    location: General
+    impact: Testing requires active local server

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Clock, Calendar, ArrowLeft, UserCheck } from 'lucide-react';
+import { Users, Clock, Calendar, ArrowLeft, UserCheck, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { fetchStaffing } from '../lib/api';
 
@@ -12,7 +12,7 @@ const Staffing = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const result = await fetchStaffing('apollo-delhi');
+                const result = await fetchStaffing();
 
                 // Transform API object to UI array format
                 const transformedData = {
@@ -35,163 +35,168 @@ const Staffing = () => {
     }, []);
 
     const getTotalOnDuty = () => {
-        return data?.staff.reduce((sum: number, s: any) => sum + s.onDuty, 0) || 0;
+        return data?.staff?.reduce((sum: number, s: any) => sum + s.onDuty, 0) || 0;
     };
 
     const getTotalStaff = () => {
-        return data?.staff.reduce((sum: number, s: any) => sum + s.total, 0) || 0;
+        return data?.staff?.reduce((sum: number, s: any) => sum + s.total, 0) || 0;
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-black via-[#0a0a0a] to-black text-white p-8">
+        <div className="min-h-screen bg-[#f8fafc] text-slate-900 p-8 md:p-12 font-sans selection:bg-primary/20">
             {/* Header */}
-            <div className="max-w-7xl mx-auto mb-8">
+            <div className="max-w-7xl mx-auto mb-14">
                 <button
                     onClick={() => navigate('/medqueue')}
-                    className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-6"
+                    className="flex items-center gap-3 text-slate-400 hover:text-slate-900 transition-all mb-8 text-[10px] font-black uppercase tracking-widest py-2 px-4 border border-slate-200 rounded-full bg-white/50 backdrop-blur-md shadow-sm w-fit"
                 >
-                    <ArrowLeft size={20} />
+                    <ArrowLeft size={16} />
                     Back to Queue
                 </button>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
-                        <h1 className="text-4xl font-black mb-2">Staffing Overview</h1>
-                        <p className="text-gray-400">Current shift status and staff allocation</p>
+                        <h1 className="text-4xl lg:text-5xl font-black text-slate-900 mb-2 uppercase tracking-tighter italic">Staff Management</h1>
+                        <p className="text-slate-400 font-bold text-sm tracking-tight italic">Shift monitoring and active personnel status</p>
                     </div>
-                    <div className="flex items-center gap-3 px-2 text-primary font-black">
-                        <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center font-bold text-white shadow-lg shadow-primary/20">MQ</div>
-                        <span className="font-bold text-xl tracking-tight uppercase italic">MedQueue</span>
+                    <div className="flex items-center gap-4 py-4 px-6 bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50">
+                        <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center font-black text-white shadow-xl shadow-primary/20">MQ</div>
+                        <span className="font-black text-xl tracking-tighter uppercase italic text-slate-900">MedQueue</span>
                     </div>
                 </div>
             </div>
 
             {loading ? (
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-gray-500">Loading staffing data...</div>
+                <div className="flex flex-col items-center justify-center h-96 gap-6">
+                    <div className="w-16 h-16 bg-primary/10 rounded-3xl flex items-center justify-center border border-primary/20 shadow-inner">
+                        <Activity className="animate-pulse text-primary" size={32} />
+                    </div>
+                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">Querying Active Staff...</p>
                 </div>
             ) : (
-                <div className="max-w-7xl mx-auto space-y-8">
+                <div className="max-w-7xl mx-auto space-y-12">
                     {/* Summary Cards */}
-                    <div className="grid md:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="glass p-6 rounded-3xl border border-white/10"
+                            className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden group hover:border-primary/20 transition-all"
                         >
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="w-12 h-12 bg-blue-500/20 rounded-2xl flex items-center justify-center">
-                                    <Users className="text-blue-400" size={24} />
-                                </div>
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-full blur-3xl -mr-12 -mt-12 group-hover:bg-primary/5 transition-colors" />
+                            <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 border border-blue-100">
+                                <Users className="text-blue-600" size={28} />
                             </div>
-                            <h3 className="text-3xl font-black mb-2">{getTotalStaff()}</h3>
-                            <p className="text-sm text-gray-400 font-semibold">Total Staff</p>
+                            <h3 className="text-4xl font-black text-slate-900 tracking-tighter italic mb-1">{getTotalStaff()}</h3>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Total Staff</p>
                         </motion.div>
 
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.1 }}
-                            className="glass p-6 rounded-3xl border border-white/10"
+                            className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden group hover:border-green-500/20 transition-all"
                         >
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="w-12 h-12 bg-green-500/20 rounded-2xl flex items-center justify-center">
-                                    <UserCheck className="text-green-400" size={24} />
-                                </div>
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-green-50/50 rounded-full blur-3xl -mr-12 -mt-12 group-hover:bg-green-500/5 transition-colors" />
+                            <div className="w-14 h-14 bg-green-50 rounded-2xl flex items-center justify-center mb-6 border border-green-100">
+                                <UserCheck className="text-green-600" size={28} />
                             </div>
-                            <h3 className="text-3xl font-black mb-2">{getTotalOnDuty()}</h3>
-                            <p className="text-sm text-gray-400 font-semibold">On Duty</p>
+                            <h3 className="text-4xl font-black text-green-600 tracking-tighter italic mb-1">{getTotalOnDuty()}</h3>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">On Duty</p>
                         </motion.div>
 
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.2 }}
-                            className="glass p-6 rounded-3xl border border-white/10"
+                            className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden group hover:border-purple-500/20 transition-all"
                         >
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="w-12 h-12 bg-purple-500/20 rounded-2xl flex items-center justify-center">
-                                    <Calendar className="text-purple-400" size={24} />
-                                </div>
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50/50 rounded-full blur-3xl -mr-12 -mt-12 group-hover:bg-purple-500/5 transition-colors" />
+                            <div className="w-14 h-14 bg-purple-50 rounded-2xl flex items-center justify-center mb-6 border border-purple-100">
+                                <Calendar className="text-purple-600" size={28} />
                             </div>
-                            <h3 className="text-3xl font-black mb-2">Day</h3>
-                            <p className="text-sm text-gray-400 font-semibold">Current Shift</p>
+                            <h3 className="text-4xl font-black text-slate-900 tracking-tighter italic mb-1">Day</h3>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Current Shift</p>
                         </motion.div>
 
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.3 }}
-                            className="glass p-6 rounded-3xl border border-white/10"
+                            className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden group hover:border-orange-500/20 transition-all"
                         >
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="w-12 h-12 bg-orange-500/20 rounded-2xl flex items-center justify-center">
-                                    <Clock className="text-orange-400" size={24} />
-                                </div>
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-orange-50/50 rounded-full blur-3xl -mr-12 -mt-12 group-hover:bg-orange-500/5 transition-colors" />
+                            <div className="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center mb-6 border border-orange-100">
+                                <Clock className="text-orange-600" size={28} />
                             </div>
-                            <h3 className="text-3xl font-black mb-2">{data?.shiftChange || '18:00'}</h3>
-                            <p className="text-sm text-gray-400 font-semibold">Shift Change</p>
+                            <h3 className="text-4xl font-black text-slate-900 tracking-tighter italic mb-1">{data?.shiftChange || '18:00'}</h3>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Shift Change</p>
                         </motion.div>
                     </div>
 
-                    {/* Staff Breakdown */}
-                    <div className="glass rounded-3xl p-8">
-                        <h2 className="text-2xl font-bold mb-6">Staff Distribution</h2>
-                        <div className="space-y-6">
-                            {data?.staff.map((member: any, i: number) => (
-                                <motion.div
-                                    key={i}
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: i * 0.1 }}
-                                    className="bg-white/[0.02] p-6 rounded-2xl border border-white/5 hover:border-primary/30 transition-all"
-                                >
-                                    <div className="flex justify-between items-center mb-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-14 h-14 bg-primary/20 rounded-2xl flex items-center justify-center">
-                                                <Users className="text-primary" size={28} />
+                    {/* Staff Distribution */}
+                    <div className="bg-white rounded-[3.5rem] p-10 border border-slate-100 shadow-2xl shadow-slate-200/50">
+                        <div className="flex items-center gap-4 mb-10">
+                            <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic">Staff Distribution</h2>
+                            <div className="h-px flex-1 bg-slate-100" />
+                        </div>
+                        <div className="grid lg:grid-cols-2 gap-10">
+                            {data?.staff.map((member: any, i: number) => {
+                                const percentage = Math.round((member.onDuty / member.total) * 100);
+                                return (
+                                    <motion.div
+                                        key={i}
+                                        initial={{ opacity: 0, x: -20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: i * 0.1 }}
+                                        className="bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100 hover:border-primary/30 hover:bg-white hover:shadow-xl transition-all group"
+                                    >
+                                        <div className="flex justify-between items-start mb-6">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-slate-100 shadow-sm group-hover:bg-primary group-hover:text-white transition-all">
+                                                    <Users size={28} className="group-hover:scale-110 transition-transform" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-2xl font-black text-slate-900 tracking-tight italic mb-1">{member.role}</h3>
+                                                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Shift: {member.shift}</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <h3 className="text-xl font-bold mb-1">{member.role}</h3>
-                                                <p className="text-sm text-gray-400">Shift: {member.shift}</p>
+                                            <div className="text-right">
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-4xl font-black text-primary italic">{member.onDuty}</span>
+                                                    <span className="text-slate-300 font-black text-xl italic">/ {member.total}</span>
+                                                </div>
+                                                <p className="text-[9px] text-primary font-black uppercase tracking-widest mt-1">
+                                                    {percentage}% Active
+                                                </p>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <div className="flex items-baseline gap-2">
-                                                <span className="text-3xl font-black text-primary">{member.onDuty}</span>
-                                                <span className="text-gray-500 font-bold">/ {member.total}</span>
-                                            </div>
-                                            <p className="text-xs text-gray-500 font-semibold mt-1">
-                                                {Math.round((member.onDuty / member.total) * 100)}% Active
-                                            </p>
-                                        </div>
-                                    </div>
 
-                                    {/* Progress Bar */}
-                                    <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
-                                        <motion.div
-                                            initial={{ width: 0 }}
-                                            animate={{ width: `${(member.onDuty / member.total) * 100}%` }}
-                                            transition={{ duration: 1, delay: i * 0.1 }}
-                                            className="h-full bg-gradient-to-r from-primary to-blue-400"
-                                        />
-                                    </div>
+                                        {/* Progress Bar */}
+                                        <div className="w-full h-4 bg-white rounded-full overflow-hidden border border-slate-100 p-0.5">
+                                            <motion.div
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${percentage}%` }}
+                                                transition={{ duration: 1.5, type: 'spring' }}
+                                                className="h-full rounded-full bg-primary shadow-lg shadow-primary/20"
+                                            />
+                                        </div>
 
-                                    <div className="mt-4 grid grid-cols-3 gap-4">
-                                        <div className="text-center">
-                                            <div className="text-lg font-black text-white">{member.total}</div>
-                                            <div className="text-[10px] text-gray-500 font-bold uppercase">Total</div>
+                                        <div className="mt-8 grid grid-cols-3 gap-6">
+                                            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center">
+                                                <div className="text-xl font-black text-slate-900 italic">{member.total}</div>
+                                                <div className="text-[9px] text-slate-400 font-black uppercase">Total</div>
+                                            </div>
+                                            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center">
+                                                <div className="text-xl font-black text-green-500 italic">{member.onDuty}</div>
+                                                <div className="text-[9px] text-slate-400 font-black uppercase">On Duty</div>
+                                            </div>
+                                            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center">
+                                                <div className="text-xl font-black text-slate-300 italic">{member.total - member.onDuty}</div>
+                                                <div className="text-[9px] text-slate-400 font-black uppercase">Off Duty</div>
+                                            </div>
                                         </div>
-                                        <div className="text-center">
-                                            <div className="text-lg font-black text-green-400">{member.onDuty}</div>
-                                            <div className="text-[10px] text-gray-500 font-bold uppercase">On Duty</div>
-                                        </div>
-                                        <div className="text-center">
-                                            <div className="text-lg font-black text-gray-400">{member.total - member.onDuty}</div>
-                                            <div className="text-[10px] text-gray-500 font-bold uppercase">Off Duty</div>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            ))}
+                                    </motion.div>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>

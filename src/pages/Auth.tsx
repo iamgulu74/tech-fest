@@ -1,370 +1,139 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Activity, GraduationCap, User, Lock, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Shield, Activity, ArrowLeft, ChevronRight, UserCircle, Building } from 'lucide-react';
 import PixelButton from '../components/PixelButton';
-
-type UserRole = 'patient' | 'student' | 'admin' | null;
-
-interface AuthState {
-    isLoggedIn: boolean;
-    role: UserRole;
-    email: string;
-    name: string;
-    hospitalId?: string;
-    hospitalName?: string;
-}
 
 const Auth = () => {
     const navigate = useNavigate();
-    const [isSignUp, setIsSignUp] = useState(false);
-    const [selectedRole, setSelectedRole] = useState<UserRole>(null);
-    const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        password: '',
-        hospitalId: ''
-    });
-    const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-    // Fetch hospitals for admin dropdown
-    const [allHospitals, setAllHospitals] = useState<{ id: string, name: string }[]>([]);
-
-    useEffect(() => {
-        const fetchHospitals = async () => {
-            try {
-                const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/hospitals`);
-                if (response.ok) {
-                    const data = await response.json();
-                    setAllHospitals(data.map((h: any) => ({ id: h.id, name: h.name })));
-                }
-            } catch (error) {
-                console.error("Error fetching hospitals for auth", error);
-            }
-        };
-        fetchHospitals();
-
-        const authData = localStorage.getItem('authState');
-        if (authData) {
-            const auth: AuthState = JSON.parse(authData);
-            if (auth.isLoggedIn && auth.role) {
-                // Redirect to their dashboard
-                redirectToRole(auth.role);
-            }
-        }
-    }, []);
-
-    const redirectToRole = (role: UserRole) => {
-        switch (role) {
-            case 'patient':
-                navigate('/patient');
-                break;
-            case 'student':
-                navigate('/edumatch');
-                break;
-            case 'admin':
-                navigate('/medqueue'); // Admin goes to MedQueue dashboard
-                break;
-            default:
-                break;
-        }
-    };
-
-    const validateForm = () => {
-        const newErrors: { [key: string]: string } = {};
-
-        if (!selectedRole) {
-            newErrors.role = 'Please select a role';
-        }
-
-        if (isSignUp && !formData.name.trim()) {
-            newErrors.name = 'Name is required';
-        }
-
-        if (!formData.email.trim()) {
-            newErrors.email = 'Email is required';
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-            newErrors.email = 'Invalid email format';
-        }
-
-        if (!formData.password) {
-            newErrors.password = 'Password is required';
-        } else if (isSignUp && formData.password.length < 6) {
-            newErrors.password = 'Password must be at least 6 characters';
-        }
-
-        if (selectedRole === 'admin' && !formData.hospitalId) {
-            newErrors.hospitalId = 'Please select a hospital';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (!validateForm()) {
-            return;
-        }
-
-        // Create auth state
-        const authState: AuthState = {
-            isLoggedIn: true,
-            role: selectedRole!,
-            email: formData.email,
-            name: isSignUp ? formData.name : formData.email.split('@')[0],
-            hospitalId: selectedRole === 'admin' ? formData.hospitalId : undefined,
-            hospitalName: selectedRole === 'admin' ?
-                allHospitals.find(h => h.id === formData.hospitalId)?.name : undefined
-        };
-
-        // Save to localStorage (in production, use secure backend auth)
-        localStorage.setItem('authState', JSON.stringify(authState));
-
-        // Redirect to appropriate dashboard
-        redirectToRole(selectedRole);
-    };
-
-    const roles = [
+    const portals = [
         {
-            id: 'patient' as UserRole,
+            id: 'patient',
+            title: 'Patient Portal',
+            subtitle: 'Healthcare Access',
+            description: 'Book beds, check symptoms, and view real-time hospital wait times with AI.',
             icon: Activity,
-            title: 'Patient',
-            description: 'Access MedQueue for hospital wait times and appointments',
             color: 'primary',
-            gradient: 'from-primary/20 to-primary/5'
+            path: '/auth/patient',
+            features: ['AI Assistant', 'Bed Reservations', 'Wait Time Tracking']
         },
         {
-            id: 'student' as UserRole,
-            icon: GraduationCap,
-            title: 'Student',
-            description: 'Access EduMatch for career guidance and assessments',
-            color: 'secondary',
-            gradient: 'from-secondary/20 to-secondary/5'
-        },
-        {
-            id: 'admin' as UserRole,
-            icon: Shield,
+            id: 'admin',
             title: 'Hospital Admin',
-            description: 'Manage hospital queues, beds, and analytics',
+            subtitle: 'Critical Operations',
+            description: 'Manage institutional queues, bed allocations, staffing, and predictive analytics.',
+            icon: Shield,
             color: 'orange-500',
-            gradient: 'from-orange-500/20 to-orange-500/5'
+            path: '/auth/admin',
+            features: ['Queue Analytics', 'Bed Management', 'Surge Predictions']
         }
     ];
 
-    // Removed hardcoded list, now using allHospitals state fetched in useEffect
-
     return (
-        <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-6 overflow-hidden">
-            {/* Background Glows */}
-            <div className="fixed top-0 left-0 w-full h-full pointer-events-none opacity-20">
-                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary rounded-full blur-[120px]" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-secondary rounded-full blur-[120px]" />
+        <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-6 relative overflow-hidden transition-colors duration-500 selection:bg-primary/20">
+            {/* Split Background Glow */}
+            <div className="fixed inset-0 pointer-events-none opacity-20">
+                <div className="absolute top-0 left-0 w-1/2 h-full bg-primary/30 blur-[150px]" />
+                <div className="absolute top-0 right-0 w-1/2 h-full bg-orange-500/20 blur-[150px]" />
             </div>
 
-            {/* Back Button */}
             <button
-                onClick={() => navigate('/')}
-                className="absolute top-6 left-6 text-gray-400 hover:text-white transition-colors flex items-center gap-2 text-sm font-medium"
+                onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/')}
+                className="absolute top-10 left-10 text-slate-400 hover:text-slate-900 transition-colors flex items-center gap-3 text-[10px] font-black uppercase tracking-widest z-50 py-2 px-4 border border-slate-200 rounded-full bg-white/50 backdrop-blur-md shadow-sm"
             >
                 <ArrowLeft size={16} />
                 Back to Home
             </button>
 
-            {/* Auth Container */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="glass rounded-[2rem] p-6 md:p-10 max-w-4xl w-full relative z-10"
-            >
-                {/* Header */}
-                <div className="text-center mb-10">
-                    <h1 className="text-2xl md:text-3xl lg:text-4xl font-black mb-3 text-white uppercase tracking-tighter">
-                        {isSignUp ? 'Create Account' : 'Welcome Back'}
-                    </h1>
-                    <p className="text-gray-400">
-                        {isSignUp
-                            ? 'Sign up to access AI-powered healthcare and education services'
-                            : 'Sign in to continue to your dashboard'
-                        }
-                    </p>
-                </div>
-
-                {/* Role Selection */}
-                <div className="mb-8">
-                    <label className="block text-sm font-bold text-gray-300 mb-4">
-                        Select Your Role
-                        {errors.role && <span className="text-red-500 ml-2 text-xs">*{errors.role}</span>}
-                    </label>
-                    <div className="grid md:grid-cols-3 gap-4">
-                        {roles.map((role) => {
-                            const Icon = role.icon;
-                            const isSelected = selectedRole === role.id;
-
-                            return (
-                                <motion.button
-                                    key={role.id}
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => {
-                                        setSelectedRole(role.id);
-                                        setErrors({ ...errors, role: '' });
-                                    }}
-                                    className={`p-6 rounded-2xl border-2 text-left transition-all relative overflow-hidden ${isSelected
-                                        ? `border-${role.color} bg-gradient-to-br ${role.gradient}`
-                                        : 'border-white/10 bg-white/[0.02] hover:border-white/20'
-                                        }`}
-                                >
-                                    {isSelected && (
-                                        <CheckCircle className={`absolute top-4 right-4 text-${role.color}`} size={20} />
-                                    )}
-                                    <div className={`w-12 h-12 rounded-xl bg-${role.color}/10 flex items-center justify-center mb-4 border border-${role.color}/20`}>
-                                        <Icon className={`text-${role.color}`} size={24} />
-                                    </div>
-                                    <h3 className="font-bold text-lg mb-2">{role.title}</h3>
-                                    <p className="text-xs text-gray-400 leading-relaxed">{role.description}</p>
-                                </motion.button>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Auth Form */}
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Name (Sign Up Only) */}
-                    <AnimatePresence>
-                        {isSignUp && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                            >
-                                <label className="block text-sm font-bold text-gray-300 mb-2">
-                                    Full Name
-                                    {errors.name && <span className="text-red-500 ml-2 text-xs">*{errors.name}</span>}
-                                </label>
-                                <div className="relative">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                                    <input
-                                        type="text"
-                                        value={formData.name}
-                                        onChange={(e) => {
-                                            setFormData({ ...formData, name: e.target.value });
-                                            setErrors({ ...errors, name: '' });
-                                        }}
-                                        className={`w-full pl-12 pr-4 py-3 bg-white/5 border rounded-xl focus:outline-none focus:border-secondary transition-all ${errors.name ? 'border-red-500' : 'border-white/10'
-                                            }`}
-                                        placeholder="Enter your full name"
-                                    />
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    {/* Email */}
-                    <div>
-                        <label className="block text-sm font-bold text-gray-300 mb-2">
-                            Email Address
-                            {errors.email && <span className="text-red-500 ml-2 text-xs">*{errors.email}</span>}
-                        </label>
-                        <div className="relative">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                            <input
-                                type="email"
-                                value={formData.email}
-                                onChange={(e) => {
-                                    setFormData({ ...formData, email: e.target.value });
-                                    setErrors({ ...errors, email: '' });
-                                }}
-                                className={`w-full pl-12 pr-4 py-3 bg-white/5 border rounded-xl focus:outline-none focus:border-secondary transition-all ${errors.email ? 'border-red-500' : 'border-white/10'
-                                    }`}
-                                placeholder="your.email@example.com"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Password */}
-                    <div>
-                        <label className="block text-sm font-bold text-gray-300 mb-2">
-                            Password
-                            {errors.password && <span className="text-red-500 ml-2 text-xs">*{errors.password}</span>}
-                        </label>
-                        <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                            <input
-                                type="password"
-                                value={formData.password}
-                                onChange={(e) => {
-                                    setFormData({ ...formData, password: e.target.value });
-                                    setErrors({ ...errors, password: '' });
-                                }}
-                                className={`w-full pl-12 pr-4 py-3 bg-white/5 border rounded-xl focus:outline-none focus:border-secondary transition-all ${errors.password ? 'border-red-500' : 'border-white/10'
-                                    }`}
-                                placeholder="Enter your password"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Hospital Selection (Admin Only) */}
-                    <AnimatePresence>
-                        {selectedRole === 'admin' && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                            >
-                                <label className="block text-sm font-bold text-gray-300 mb-2">
-                                    Assign to Hospital
-                                    {errors.hospitalId && <span className="text-red-500 ml-2 text-xs">*{errors.hospitalId}</span>}
-                                </label>
-                                <div className="relative">
-                                    <Activity className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                                    <select
-                                        value={formData.hospitalId}
-                                        onChange={(e) => {
-                                            setFormData({ ...formData, hospitalId: e.target.value });
-                                            setErrors({ ...errors, hospitalId: '' });
-                                        }}
-                                        className={`w-full pl-12 pr-4 py-3 bg-white/5 border rounded-xl focus:outline-none focus:border-orange-500 transition-all appearance-none ${errors.hospitalId ? 'border-red-500' : 'border-white/10'
-                                            }`}
-                                    >
-                                        <option value="" disabled className="bg-[#0a0a0a]">Select Hospital</option>
-                                        {allHospitals.map(h => (
-                                            <option key={h.id} value={h.id} className="bg-[#0a0a0a]">{h.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    {/* Submit Button */}
-                    <PixelButton
-                        type="submit"
-                        className="w-full"
-                        color="secondary"
+            <div className="max-w-5xl w-full relative z-10">
+                <div className="text-center mb-16">
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
                     >
-                        {isSignUp ? 'Create Account' : 'Sign In'}
-                    </PixelButton>
-                </form>
+                        <h1 className="text-4xl md:text-6xl font-black text-slate-900 uppercase tracking-tighter mb-4 italic leading-tight">
+                            Select Your <span className="text-primary italic">Gateway</span>
+                        </h1>
+                        <p className="text-slate-500 max-w-xl mx-auto font-medium text-lg leading-relaxed">
+                            Choose the specialized portal to continue. Each interface is optimized for your unique healthcare role and requirements.
+                        </p>
+                    </motion.div>
+                </div>
 
-                {/* Toggle Sign In/Sign Up */}
-                <div className="mt-6 text-center">
-                    <p className="text-gray-400 text-sm">
-                        {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-                        <button
-                            onClick={() => {
-                                setIsSignUp(!isSignUp);
-                                setErrors({});
-                            }}
-                            className="ml-2 text-secondary font-bold hover:underline"
-                        >
-                            {isSignUp ? 'Sign In' : 'Sign Up'}
-                        </button>
+                <div className="grid md:grid-cols-2 gap-10">
+                    {portals.map((portal, idx) => {
+                        const Icon = portal.icon;
+                        const isPrimary = portal.color === 'primary';
+                        
+                        return (
+                            <motion.div
+                                key={portal.id}
+                                initial={{ opacity: 0, x: idx === 0 ? -40 : 40 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: idx * 0.1, type: "spring", stiffness: 100 }}
+                                onClick={() => navigate(portal.path)}
+                                className={`glass group relative p-12 rounded-[3.5rem] border bg-white transition-all cursor-pointer hover:shadow-2xl hover:scale-[1.02] ${
+                                    isPrimary 
+                                    ? 'border-slate-200 hover:border-primary/50' 
+                                    : 'border-slate-200 hover:border-orange-500/50'
+                                }`}
+                            >
+                                <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-10 border transition-all duration-500 ${
+                                    isPrimary
+                                    ? 'bg-primary/5 border-primary/10 group-hover:bg-primary/10'
+                                    : 'bg-orange-500/5 border-orange-500/10 group-hover:bg-orange-500/10'
+                                } shadow-inner shadow-white`}>
+                                    <Icon className={isPrimary ? 'text-primary' : 'text-orange-500'} size={40} />
+                                </div>
+
+                                <div className="space-y-6">
+                                    <div>
+                                        <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${
+                                            isPrimary ? 'text-primary' : 'text-orange-500'
+                                        }`}>
+                                            {portal.subtitle}
+                                        </p>
+                                        <h2 className="text-4xl font-black text-slate-900 tracking-tighter">{portal.title}</h2>
+                                    </div>
+                                    
+                                    <p className="text-slate-500 leading-relaxed font-bold text-sm">
+                                        {portal.description}
+                                    </p>
+
+                                    <div className="flex flex-wrap gap-3 py-4">
+                                        {portal.features.map(f => (
+                                            <span key={f} className="text-[9px] font-black uppercase tracking-widest px-4 py-1.5 bg-slate-50 border border-slate-100 rounded-full text-slate-400">
+                                                {f}
+                                            </span>
+                                        ))}
+                                    </div>
+
+                                    <div className="pt-6">
+                                        <PixelButton 
+                                            onClick={() => navigate(portal.path)}
+                                            color={isPrimary ? "primary" : "secondary"} 
+                                            className="w-full"
+                                        >
+                                            Enter Portal <ChevronRight size={18} />
+                                        </PixelButton>
+                                    </div>
+                                </div>
+
+                                {/* Background Pattern Overlay */}
+                                <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
+                                    {isPrimary ? <UserCircle size={150} className="text-primary" /> : <Building size={150} className="text-orange-500" />}
+                                </div>
+                            </motion.div>
+                        );
+                    })}
+                </div>
+
+                <div className="mt-20 text-center">
+                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">
+                        End-to-end encrypted infrastructure for healthcare entities
                     </p>
                 </div>
-            </motion.div>
+            </div>
         </div>
     );
 };

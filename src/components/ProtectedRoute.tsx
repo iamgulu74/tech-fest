@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-type UserRole = 'patient' | 'student' | 'admin' | null;
+type UserRole = 'patient' | 'admin' | null;
 
 interface AuthState {
     isLoggedIn: boolean;
@@ -42,7 +42,6 @@ export const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) 
             if (!allowedRoles.includes(auth.role)) {
                 switch (auth.role) {
                     case 'patient': navigate('/patient'); break;
-                    case 'student': navigate('/edumatch'); break;
                     case 'admin': navigate('/medqueue'); break;
                     default: navigate('/auth'); break;
                 }

@@ -7,7 +7,6 @@ import {
     Plus,
     BarChart3,
     Activity,
-    Settings,
     MoreVertical,
     LogOut,
     Bell,
@@ -20,7 +19,6 @@ import {
     Stethoscope
 } from 'lucide-react';
 import BedAllocation from '../components/BedAllocation';
-import SymptomChecker from '../components/SymptomChecker';
 import { fetchHospitalDetails, predictWaitTime, sendBookingNotification, admitPatient, callInPatient } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/ProtectedRoute';
@@ -69,9 +67,9 @@ const MedQueueAdmin = () => {
     };
 
     const stats = [
-        { label: 'Total OPD Today', value: hospitalData?.analytics?.dailyPatients || 'Data Unavailable', icon: Users, color: 'text-blue-500' },
-        { label: 'Available Beds', value: hospitalData?.beds?.available != null ? hospitalData.beds.available : 'Data Unavailable', icon: Bed, color: 'text-green-500' },
-        { label: 'Surge Risk', value: hospitalData?.analytics ? (hospitalData.analytics.currentLoad > 80 ? 'Critical' : 'Normal') : 'Data Unavailable', icon: TrendingUp, color: hospitalData?.analytics?.currentLoad > 80 ? 'text-red-500' : 'text-yellow-500' },
+        { label: 'Total OPD Today', value: hospitalData?.analytics?.dailyPatients || 'Data Unavailable', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { label: 'Available Beds', value: hospitalData?.beds?.available != null ? hospitalData.beds.available : 'Data Unavailable', icon: Bed, color: 'text-green-600', bg: 'bg-green-50' },
+        { label: 'Surge Risk', value: hospitalData?.analytics ? (hospitalData.analytics.currentLoad > 80 ? 'Critical' : 'Normal') : 'Data Unavailable', icon: TrendingUp, color: hospitalData?.analytics?.currentLoad > 80 ? 'text-red-600' : 'text-amber-600', bg: hospitalData?.analytics?.currentLoad > 80 ? 'bg-red-50' : 'bg-amber-50' },
     ];
 
     useEffect(() => {
@@ -106,9 +104,6 @@ const MedQueueAdmin = () => {
         };
         loadData();
 
-        // Optional: Poll for updates every 10 seconds for real-time feel
-        const interval = setInterval(loadData, 5000);
-        return () => clearInterval(interval);
     }, [hospitalId]);
 
     const notifyPatient = async (patient: any) => {
@@ -185,7 +180,7 @@ const MedQueueAdmin = () => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row min-h-screen bg-[#0a0a0a] text-gray-100 font-sans">
+        <div className="flex flex-col lg:flex-row min-h-screen bg-[#f8fafc] text-slate-900 font-sans selection:bg-primary/20 transition-colors duration-500">
             {/* Notification Toast */}
             <AnimatePresence>
                 {successMsg && (
@@ -193,10 +188,12 @@ const MedQueueAdmin = () => {
                         initial={{ opacity: 0, y: 50 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
-                        className="fixed bottom-10 right-10 bg-secondary text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-[100] border border-white/20"
+                        className="fixed bottom-10 right-10 bg-slate-900 text-white px-8 py-5 rounded-3xl shadow-2xl flex items-center gap-4 z-[100] border border-white/10 backdrop-blur-xl"
                     >
-                        <CheckCircle2 size={24} />
-                        <span className="font-bold">{successMsg}</span>
+                        <div className="w-10 h-10 rounded-2xl bg-green-500/20 flex items-center justify-center border border-green-500/30">
+                            <CheckCircle2 size={24} className="text-green-400" />
+                        </div>
+                        <span className="font-black uppercase tracking-tighter italic text-sm">{successMsg}</span>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -208,104 +205,104 @@ const MedQueueAdmin = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md"
+                        className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md"
                         onClick={() => setAdmitModalOpen(false)}
                     >
                         <motion.div
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.9, y: 20 }}
-                            className="glass max-w-lg w-full p-8 rounded-[2.5rem] border border-white/10 relative"
+                            className="bg-white max-w-lg w-full p-10 rounded-[3.5rem] border border-slate-200 shadow-2xl relative"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <button
                                 onClick={() => setAdmitModalOpen(false)}
-                                className="absolute top-6 right-6 p-2 bg-white/5 rounded-full hover:bg-white/10 text-gray-400 transition-colors"
+                                className="absolute top-8 right-8 p-3 bg-slate-50 rounded-2xl hover:bg-slate-100 text-slate-400 transition-all border border-slate-100"
                             >
                                 <X size={20} />
                             </button>
 
-                            <div className="flex items-center gap-4 mb-8">
-                                <div className="w-12 h-12 bg-primary/20 rounded-2xl flex items-center justify-center border border-primary/30">
-                                    <Plus className="text-primary" size={24} />
+                            <div className="flex items-center gap-5 mb-10">
+                                <div className="w-16 h-16 bg-primary/10 rounded-3xl flex items-center justify-center border border-primary/20 shadow-inner">
+                                    <Plus className="text-primary" size={32} />
                                 </div>
                                 <div>
-                                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Admit Patient</h2>
-                                    <p className="text-gray-500 text-xs font-bold uppercase">Manual Entry Details</p>
+                                    <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic">Admit Patient</h2>
+                                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">Manual Institution Entry</p>
                                 </div>
                             </div>
 
-                            <form onSubmit={handleAdmitSubmit} className="space-y-4">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] uppercase font-black tracking-widest text-gray-500 ml-1">Patient Name</label>
+                            <form onSubmit={handleAdmitSubmit} className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 ml-2">Patient Name</label>
                                     <input
                                         type="text"
                                         required
                                         value={admitForm.name}
                                         onChange={(e) => setAdmitForm({ ...admitForm, name: e.target.value })}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:outline-none transition-colors font-medium"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-slate-900 focus:border-primary focus:bg-white focus:outline-none transition-all font-bold placeholder:text-slate-300"
                                         placeholder="Full Name"
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] uppercase font-black tracking-widest text-gray-500 ml-1">Phone Number</label>
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 ml-2">Phone Number</label>
                                         <div className="relative">
-                                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
+                                            <Phone className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                                             <input
                                                 type="tel"
                                                 required
                                                 value={admitForm.phone}
                                                 onChange={(e) => setAdmitForm({ ...admitForm, phone: e.target.value })}
-                                                className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-3 text-white focus:border-primary focus:outline-none transition-colors font-medium"
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-12 pr-6 py-4 text-slate-900 focus:border-primary focus:bg-white focus:outline-none transition-all font-bold placeholder:text-slate-300"
                                                 placeholder="+91..."
                                             />
                                         </div>
                                     </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] uppercase font-black tracking-widest text-gray-500 ml-1">Department</label>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 ml-2">Department</label>
                                         <div className="relative">
-                                            <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
+                                            <Stethoscope className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                                             <select
                                                 value={admitForm.doctorType}
                                                 onChange={(e) => setAdmitForm({ ...admitForm, doctorType: e.target.value })}
-                                                className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-3 text-white focus:border-primary focus:outline-none transition-colors font-medium appearance-none"
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-12 pr-6 py-4 text-slate-900 focus:border-primary focus:bg-white focus:outline-none transition-all font-bold appearance-none"
                                             >
-                                                <option className="bg-[#1a1a1a]">General Physician</option>
-                                                <option className="bg-[#1a1a1a]">Cardiologist</option>
-                                                <option className="bg-[#1a1a1a]">Pediatrician</option>
-                                                <option className="bg-[#1a1a1a]">Orthopedic</option>
-                                                <option className="bg-[#1a1a1a]">Neurologist</option>
-                                                <option className="bg-[#1a1a1a]">Emergency</option>
+                                                <option className="bg-white">General Physician</option>
+                                                <option className="bg-white">Cardiologist</option>
+                                                <option className="bg-white">Pediatrician</option>
+                                                <option className="bg-white">Orthopedic</option>
+                                                <option className="bg-white">Neurologist</option>
+                                                <option className="bg-white">Emergency</option>
                                             </select>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="space-y-1">
-                                    <label className="text-[10px] uppercase font-black tracking-widest text-gray-500 ml-1">Address</label>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 ml-2">Address</label>
                                     <div className="relative">
-                                        <MapPin className="absolute left-3 top-3 text-gray-500" size={14} />
+                                        <MapPin className="absolute left-5 top-5 text-slate-400" size={16} />
                                         <textarea
                                             rows={2}
                                             value={admitForm.address}
                                             onChange={(e) => setAdmitForm({ ...admitForm, address: e.target.value })}
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-3 text-white focus:border-primary focus:outline-none transition-colors font-medium resize-none text-sm"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-12 pr-6 py-4 text-slate-900 focus:border-primary focus:bg-white focus:outline-none transition-all font-bold resize-none text-sm placeholder:text-slate-300"
                                             placeholder="Residential Address"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="pt-4 flex gap-3">
+                                <div className="pt-6 flex gap-4">
                                     <button
                                         type="button"
                                         onClick={autoFillForm}
-                                        className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 font-bold flex items-center gap-2 transition-all text-xs uppercase tracking-wider"
+                                        className="px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 font-black flex items-center gap-3 transition-all text-[10px] uppercase tracking-widest"
                                     >
-                                        <Zap size={16} /> Auto-Fill
+                                        <Zap size={18} /> Auto-Fill
                                     </button>
-                                    <PixelButton type="submit" color="primary" className="flex-1">
+                                    <PixelButton type="submit" color="primary" className="flex-1 py-4">
                                         {loading ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />} Admit Patient
                                     </PixelButton>
                                 </div>
@@ -316,16 +313,16 @@ const MedQueueAdmin = () => {
             </AnimatePresence>
 
             {/* Mobile Header Toggle */}
-            <div className="lg:hidden flex items-center justify-between p-4 border-b border-white/5 bg-black/50 sticky top-0 z-50">
+            <div className="lg:hidden flex items-center justify-between p-6 border-b border-slate-100 bg-white sticky top-0 z-50">
                 <div className="flex items-center gap-3" onClick={() => navigate('/')}>
-                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center font-bold text-white">MQ</div>
-                    <span className="font-bold uppercase italic text-white">MedQueue</span>
+                    <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center font-black text-white shadow-lg shadow-primary/20">MQ</div>
+                    <span className="font-black uppercase italic text-slate-900 tracking-tighter">MedQueue</span>
                 </div>
                 <button
                     onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    className="p-2 text-white bg-white/5 rounded-xl border border-white/10"
+                    className="p-3 text-slate-900 bg-slate-50 rounded-2xl border border-slate-100"
                 >
-                    <MoreVertical size={20} />
+                    <MoreVertical size={24} />
                 </button>
             </div>
 
@@ -337,81 +334,77 @@ const MedQueueAdmin = () => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setMobileMenuOpen(false)}
-                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+                        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden"
                     />
                 )}
             </AnimatePresence>
 
             {/* Sidebar */}
-            <aside className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-white/5 bg-[#0a0a0a] transition-transform duration-300 lg:relative lg:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-                } flex flex-col p-6 shrink-0`}>
-                <div className="flex items-center gap-3 mb-10 px-2 text-primary font-black cursor-pointer hidden lg:flex" onClick={() => navigate('/')}>
-                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center font-bold text-white shadow-lg shadow-primary/20">MQ</div>
-                    <span className="font-bold text-xl tracking-tight uppercase italic text-white">MedQueue</span>
+            <aside className={`fixed inset-y-0 left-0 z-50 w-72 border-r border-slate-100 bg-white transition-transform duration-500 lg:relative lg:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+                } flex flex-col p-8 shrink-0`}>
+                <div className="flex items-center gap-4 mb-14 px-2 text-primary font-black cursor-pointer hidden lg:flex" onClick={() => navigate('/')}>
+                    <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center font-black text-white shadow-xl shadow-primary/20">MQ</div>
+                    <span className="font-black text-2xl tracking-tighter uppercase italic text-slate-900">MedQueue</span>
                 </div>
 
-                <nav className="flex-1 space-y-2">
+                <nav className="flex-1 space-y-3">
                     <button
                         onClick={() => navigate('/medqueue')}
-                        className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-bold transition-all bg-primary/20 text-primary border border-primary/20 shadow-lg shadow-primary/5"
+                        className="flex items-center gap-4 w-full px-5 py-4 rounded-2xl text-sm font-black transition-all bg-primary/10 text-primary border border-primary/10 shadow-lg shadow-primary/5"
                     >
-                        <Activity size={18} />
+                        <Activity size={20} />
                         Live Queue
                     </button>
                     <button
                         onClick={() => navigate('/wards-beds')}
-                        className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-bold transition-all text-gray-500 hover:bg-white/5 hover:text-white"
+                        className="flex items-center gap-4 w-full px-5 py-4 rounded-2xl text-sm font-black transition-all text-slate-400 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100"
                     >
-                        <Bed size={18} />
+                        <Bed size={20} />
                         Wards & Beds
                     </button>
                     <button
                         onClick={() => navigate('/staffing')}
-                        className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-bold transition-all text-gray-500 hover:bg-white/5 hover:text-white"
+                        className="flex items-center gap-4 w-full px-5 py-4 rounded-2xl text-sm font-black transition-all text-slate-400 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100"
                     >
-                        <Users size={18} />
+                        <Users size={20} />
                         Staffing
                     </button>
                     <button
                         onClick={() => navigate('/analytics')}
-                        className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-bold transition-all text-gray-500 hover:bg-white/5 hover:text-white"
+                        className="flex items-center gap-4 w-full px-5 py-4 rounded-2xl text-sm font-black transition-all text-slate-400 hover:bg-slate-50 hover:text-slate-900 border border-transparent hover:border-slate-100"
                     >
-                        <BarChart3 size={18} />
+                        <BarChart3 size={20} />
                         Analytics
-                    </button>
-                    <button
-                        className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-bold transition-all text-gray-500 hover:bg-white/5 hover:text-white opacity-50 cursor-not-allowed"
-                    >
-                        <Settings size={18} />
-                        Settings
                     </button>
                 </nav>
 
-                <button
-                    onClick={signOut}
-                    className="flex items-center gap-3 px-4 py-3 text-gray-500 hover:text-white transition-colors text-sm mt-auto font-bold uppercase tracking-wider"
-                >
-                    <LogOut size={18} />
-                    Logout
-                </button>
+                <div className="mt-auto border-t border-slate-100 pt-8">
+                    <button
+                        onClick={signOut}
+                        className="flex items-center gap-4 px-5 py-4 text-slate-400 hover:text-red-500 transition-colors text-xs font-black uppercase tracking-[0.2em] w-full"
+                    >
+                        <LogOut size={20} />
+                        Terminate Session
+                    </button>
+                </div>
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
-                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
+            <main className="flex-1 overflow-y-auto p-8 md:p-12 custom-scrollbar">
+                <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-8 mb-14">
                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                        <h1 className="text-3xl font-black text-white mb-2 uppercase tracking-tighter">Hospital Command Center</h1>
-                        <p className="text-gray-500 font-medium">{hospitalName} • <span className="text-primary">Live Infrastructure</span></p>
+                        <h1 className="text-4xl lg:text-5xl font-black text-slate-900 mb-2 uppercase tracking-tighter italic">Command Center</h1>
+                        <p className="text-slate-400 font-bold text-sm tracking-tight">{hospitalName} • <span className="text-primary font-black uppercase tracking-widest text-[10px]">Active Infrastructure</span></p>
                     </motion.div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-6">
                         <div className="relative">
                             <button
                                 onClick={() => setShowNotifications(!showNotifications)}
-                                className={`p-3 bg-white/5 rounded-2xl border border-white/10 text-gray-400 hover:text-white transition-all relative ${showNotifications ? 'text-primary border-primary/20 bg-primary/5' : ''}`}
+                                className={`p-4 bg-white rounded-2xl border border-slate-200 text-slate-400 hover:text-slate-900 hover:shadow-xl transition-all relative group ${showNotifications ? 'text-primary border-primary/30 ring-4 ring-primary/5' : ''}`}
                             >
-                                <Bell size={20} />
+                                <Bell size={24} />
                                 {notifications.some(n => !n.read) && (
-                                    <span className="absolute top-3 right-3 w-2 h-2 bg-primary rounded-full ring-2 ring-[#0a0a0a]" />
+                                    <span className="absolute top-4 right-4 w-2.5 h-2.5 bg-primary rounded-full ring-4 ring-white" />
                                 )}
                             </button>
 
@@ -421,43 +414,45 @@ const MedQueueAdmin = () => {
                                     <>
                                         <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
                                         <motion.div
-                                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                            initial={{ opacity: 0, y: 15, scale: 0.95 }}
                                             animate={{ opacity: 1, y: 0, scale: 1 }}
-                                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                            className="absolute right-0 mt-4 w-80 glass rounded-[2rem] border border-white/10 shadow-2xl z-50 overflow-hidden"
+                                            exit={{ opacity: 0, y: 15, scale: 0.95 }}
+                                            className="absolute right-0 mt-6 w-[360px] bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl z-50 overflow-hidden"
                                         >
-                                            <div className="p-5 border-b border-white/5 flex justify-between items-center bg-white/5">
-                                                <h3 className="text-xs font-black uppercase tracking-widest text-white">System Alerts</h3>
+                                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-900 italic">System Alerts</h3>
                                                 <button
                                                     onClick={() => setNotifications(notifications.map(n => ({ ...n, read: true })))}
-                                                    className="text-[10px] font-bold text-primary hover:underline uppercase"
+                                                    className="text-[9px] font-black text-primary hover:underline uppercase tracking-widest"
                                                 >
                                                     Mark all read
                                                 </button>
                                             </div>
-                                            <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
+                                            <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
                                                 {notifications.length > 0 ? (
                                                     notifications.map((n) => (
                                                         <div
                                                             key={n.id}
-                                                            className={`p-5 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer relative ${!n.read ? 'bg-primary/5' : ''}`}
+                                                            className={`p-6 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer relative ${!n.read ? 'bg-primary/[0.03]' : ''}`}
                                                         >
-                                                            {!n.read && <div className="absolute left-2 top-1/2 -translate-y-1/2 w-1 h-10 bg-primary rounded-full" />}
-                                                            <p className={`text-xs font-bold mb-1 ${!n.read ? 'text-white' : 'text-gray-400'}`}>{n.title}</p>
-                                                            <p className="text-[10px] text-gray-500 leading-relaxed">{n.message}</p>
-                                                            <p className="text-[9px] text-gray-600 font-bold uppercase mt-2 italic">{n.time}</p>
+                                                            {!n.read && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-12 bg-primary rounded-r-full" />}
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <p className={`text-xs font-black uppercase tracking-tight ${!n.read ? 'text-slate-900' : 'text-slate-400'}`}>{n.title}</p>
+                                                                <p className="text-[9px] text-slate-300 font-bold uppercase italic">{n.time}</p>
+                                                            </div>
+                                                            <p className="text-xs text-slate-500 font-medium leading-relaxed">{n.message}</p>
                                                         </div>
                                                     ))
                                                 ) : (
-                                                    <div className="p-10 text-center text-gray-600">
-                                                        <Activity size={24} className="mx-auto mb-2 opacity-20" />
-                                                        <p className="text-[10px] font-black uppercase tracking-widest">No Active Alerts</p>
+                                                    <div className="p-16 text-center">
+                                                        <Activity size={32} className="mx-auto mb-4 opacity-10 text-slate-900" />
+                                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300 italic">No Active Alerts</p>
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="p-4 text-center bg-white/5">
-                                                <button className="text-[10px] font-black text-gray-500 hover:text-white uppercase tracking-widest transition-colors">
-                                                    Infrastructure Audit Log
+                                            <div className="p-5 text-center bg-slate-50 border-t border-slate-100">
+                                                <button className="text-[9px] font-black text-slate-400 hover:text-slate-900 uppercase tracking-[0.3em] transition-colors">
+                                                    Full Infrastructure Audit Log
                                                 </button>
                                             </div>
                                         </motion.div>
@@ -469,92 +464,103 @@ const MedQueueAdmin = () => {
                         <button
                             onClick={() => {
                                 setAdmitModalOpen(true);
-                                autoFillForm(); // Optional: Auto-fill on open for speed
+                                autoFillForm();
                             }}
                             disabled={loading}
-                            className="btn-primary flex items-center gap-2 font-black py-4 px-8 rounded-2xl shadow-xl shadow-primary/20 uppercase tracking-wider text-xs border border-white/10 hover:scale-105 active:scale-95 transition-all"
+                            className="bg-primary text-white flex items-center gap-3 font-black py-5 px-10 rounded-[1.5rem] shadow-2xl shadow-primary/30 uppercase tracking-[0.2em] text-[10px] hover:scale-105 active:scale-95 transition-all border-none relative overflow-hidden group"
                         >
-                            {loading ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />} Admittance
+                            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                            {loading ? <Loader2 size={20} className="animate-spin relative z-10" /> : <Plus size={20} className="relative z-10" />} 
+                            <span className="relative z-10">Admittance Protocol</span>
                         </button>
                     </div>
                 </header>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-14">
                     {stats.map((stat) => (
                         <motion.div
                             key={stat.label}
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            className="glass p-6 rounded-[2rem] border border-white/5 relative overflow-hidden group"
+                            className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden group hover:border-primary/20 transition-all"
                         >
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-primary/10 transition-colors" />
-                            <div className="flex justify-between items-start mb-6">
-                                <div className={`p-4 rounded-2xl bg-white/5 ${stat.color} shadow-inner`}>
-                                    <stat.icon size={24} />
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-primary/5 transition-colors" />
+                            <div className="flex justify-between items-start mb-8">
+                                <div className={`p-5 rounded-3xl ${stat.bg} ${stat.color} shadow-inner`}>
+                                    <stat.icon size={28} />
                                 </div>
-                                <MoreVertical className="text-gray-700" size={18} />
+                                <MoreVertical className="text-slate-200" size={20} />
                             </div>
-                            <p className="text-gray-500 text-xs font-black uppercase tracking-widest mb-1">{stat.label}</p>
-                            <h2 className="text-4xl font-black text-white tracking-tighter">{stat.value}</h2>
+                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">{stat.label}</p>
+                            <h2 className="text-5xl font-black text-slate-900 tracking-tighter italic">{stat.value}</h2>
                         </motion.div>
                     ))}
                 </div>
 
-                <div className="grid lg:grid-cols-12 gap-8">
+                <div className="grid lg:grid-cols-12 gap-10">
                     {/* Queue Management */}
-                    <div className="lg:col-span-8 space-y-8">
-                        <section className="glass rounded-[2.5rem] p-8 border border-white/5 backdrop-blur-3xl">
-                            <div className="flex justify-between items-center mb-8">
-                                <h3 className="text-xl font-black text-white uppercase tracking-tighter flex items-center gap-2">
-                                    <Users className="text-primary" size={20} />
-                                    Live OPD Queue
-                                </h3>
-                                <div className="flex gap-2 bg-black/40 p-1 rounded-full border border-white/5">
-                                    <button className="text-[10px] px-4 py-1.5 rounded-full bg-primary/20 text-primary font-bold transition-all">Today</button>
-                                    <button className="text-[10px] px-4 py-1.5 rounded-full text-gray-500 hover:text-white font-bold transition-all">History</button>
+                    <div className="lg:col-span-8 space-y-10">
+                        <section className="bg-white rounded-[3.5rem] p-10 border border-slate-100 shadow-2xl shadow-slate-200/50">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
+                                <div>
+                                    <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3 italic">
+                                        <Users className="text-primary" size={24} />
+                                        Live OPD Queue
+                                    </h3>
+                                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mt-1 ml-9">Real-time Patient Flow</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button className="text-[10px] px-6 py-2 rounded-xl bg-slate-50 text-slate-900 font-black ring-1 ring-slate-100 uppercase tracking-widest">Today Only</button>
                                 </div>
                             </div>
 
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                                 {loading && queue.length === 0 ? (
-                                    <div className="flex flex-col items-center py-12 gap-4">
-                                        <Loader2 className="animate-spin text-primary" size={32} />
-                                        <p className="text-gray-500 text-xs font-bold uppercase tracking-widest animate-pulse">Neural Sync in Progress...</p>
+                                    <div className="flex flex-col items-center py-20 gap-6">
+                                        <div className="w-16 h-16 bg-primary/10 rounded-3xl flex items-center justify-center border border-primary/20">
+                                            <Loader2 className="animate-spin text-primary" size={32} />
+                                        </div>
+                                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] animate-pulse">Neural Grid Syncing...</p>
                                     </div>
                                 ) : queue.map((patient, _i) => (
                                     <motion.div
                                         key={patient.id}
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
-                                        className="flex flex-col sm:flex-row items-center justify-between p-5 rounded-[1.5rem] bg-white/[0.03] border border-white/5 hover:border-primary/40 hover:bg-white/[0.05] transition-all group gap-4 relative overflow-hidden"
+                                        className="flex flex-col sm:flex-row items-center justify-between p-7 rounded-[2.5rem] bg-slate-50/50 border border-slate-100 hover:border-primary/30 hover:bg-white hover:shadow-xl transition-all group gap-6 relative overflow-hidden"
                                     >
-                                        <div className="flex items-center gap-5 w-full sm:w-auto z-10">
-                                            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black text-lg shadow-inner group-hover:scale-110 transition-transform">
+                                        <div className="flex items-center gap-6 w-full sm:w-auto z-10">
+                                            <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-primary font-black text-xl shadow-xl shadow-slate-200/50 group-hover:scale-110 transition-transform border border-slate-100">
                                                 {patient.name[0]}
                                             </div>
                                             <div>
-                                                <h4 className="font-bold text-sm text-white">{patient.name}</h4>
-                                                <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest">{patient.id} • Verified</p>
+                                                <h4 className="font-black text-base text-slate-900 tracking-tight italic">{patient.name}</h4>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{patient.id}</span>
+                                                    <span className="w-1 h-1 bg-slate-200 rounded-full" />
+                                                    <span className="text-[10px] text-green-500 font-black uppercase tracking-widest">Verified</span>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="flex items-center justify-between sm:justify-end gap-10 w-full sm:w-auto z-10">
+                                        <div className="flex items-center justify-between sm:justify-end gap-12 w-full sm:w-auto z-10">
                                             <div className="text-right hidden sm:block">
-                                                <p className="text-[10px] text-gray-600 mb-1 font-black uppercase tracking-widest">Wait Prediction</p>
-                                                <p className="text-sm font-black text-primary italic">{patient.wait}</p>
+                                                <p className="text-[9px] text-slate-300 mb-1 font-black uppercase tracking-[0.2em]">Wait Prediction</p>
+                                                <p className="text-base font-black text-primary italic underline underline-offset-4 decoration-primary/20">{patient.wait}</p>
                                             </div>
-                                            <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-4">
                                                 <button
                                                     onClick={() => notifyPatient(patient)}
                                                     disabled={notifyingId === patient.id}
-                                                    className="p-3 bg-white/5 text-gray-400 rounded-xl hover:bg-primary/20 hover:text-primary transition-all border border-white/5 disabled:opacity-50 active:scale-95"
+                                                    className="p-4 bg-white text-slate-400 rounded-2xl hover:text-primary hover:shadow-lg transition-all border border-slate-100 disabled:opacity-50 active:scale-95 group/btn"
                                                     title="Notify Patient via SMS"
                                                 >
-                                                    {notifyingId === patient.id && !successMsg?.includes('called') ? <Loader2 size={16} className="animate-spin" /> : <Bell size={16} />}
+                                                    {notifyingId === patient.id && !successMsg?.includes('called') ? <Loader2 size={18} className="animate-spin" /> : <Bell size={18} className="group-hover/btn:animate-ring" />}
                                                 </button>
                                                 <PixelButton
                                                     onClick={() => handleCallIn(patient)}
                                                     color="primary"
+                                                    className="py-3 px-8"
                                                 >
                                                     Call In
                                                 </PixelButton>
@@ -562,6 +568,11 @@ const MedQueueAdmin = () => {
                                         </div>
                                     </motion.div>
                                 ))}
+                                {queue.length === 0 && !loading && (
+                                    <div className="py-20 text-center">
+                                        <p className="text-slate-400 text-sm font-bold italic">No patients in queue</p>
+                                    </div>
+                                )}
                             </div>
                         </section>
 
@@ -569,24 +580,24 @@ const MedQueueAdmin = () => {
                     </div>
 
                     {/* Widgets Sidebar */}
-                    <div className="lg:col-span-4 space-y-8">
-                        <section className="bg-gradient-to-br from-primary/20 to-transparent border border-primary/20 rounded-[2.5rem] p-8 relative overflow-hidden group">
-                            <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/20 rounded-full blur-3xl group-hover:scale-110 transition-transform duration-500" />
-                            <div className="flex items-center gap-3 text-primary font-black text-xs uppercase tracking-widest mb-4">
-                                <TrendingUp size={16} />
-                                Prediction Insight
+                    <div className="lg:col-span-4 space-y-10">
+                        <section className="bg-white border border-slate-100 rounded-[3rem] p-10 relative overflow-hidden group shadow-xl shadow-slate-200/50">
+                            <div className="absolute top-0 right-0 w-48 h-48 bg-primary/[0.03] rounded-full blur-3xl group-hover:scale-125 transition-transform duration-700" />
+                            <div className="flex items-center gap-3 text-primary font-black text-[10px] uppercase tracking-[0.3em] mb-6">
+                                <TrendingUp size={18} />
+                                Intelligence Hub
                             </div>
-                            <h4 className="text-lg font-bold text-white mb-3">Surge Warning</h4>
-                            <p className="text-xs text-gray-400 leading-relaxed font-bold">
-                                OPD influx predicted to increase by <span className="text-primary font-black animate-pulse underline">15.4%</span> between 8 PM and 10 PM.
-                                <br /><br />
-                                Recommendation: Activate Ward D overflow protocol and stagger nursing shifts.
+                            <h4 className="text-xl font-black text-slate-900 mb-4 tracking-tighter italic">Surge Warning</h4>
+                            <p className="text-xs text-slate-500 leading-relaxed font-bold">
+                                OPD influx predicted to increase by <span className="text-primary font-black underline underline-offset-4 decoration-primary/30">15.4%</span> between 8 PM and 10 PM.
                             </p>
+                            <div className="mt-8 p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 italic">Recommendation</p>
+                                <p className="text-[11px] text-slate-600 font-bold leading-relaxed">
+                                    Activate Ward D overflow protocol and stagger nursing shifts for peak performance.
+                                </p>
+                            </div>
                         </section>
-
-                        <div className="h-[600px]">
-                            <SymptomChecker />
-                        </div>
                     </div>
                 </div>
             </main>

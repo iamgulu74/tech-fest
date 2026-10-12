@@ -5,13 +5,14 @@
   "localEndpoint": "http://localhost:5173",
   "executionArgs": {
     "projectName": "trithon",
-    "projectPath": "c:/Quick Share/trithon",
+    "projectPath": "c:\\Quick Share\\trithon",
     "testIds": [],
-    "additionalInstruction": "Execute all 17 test cases focusing on button functionality: navigation links, portal selection, logout buttons, filter toggles, see all matches toggle, aptitude test flow, filter modal, map navigation, and symptom checker interactions. Verify all buttons are clickable and trigger expected UI changes or navigation.",
+    "additionalInstruction": "Please prioritize testing the /auth/admin route and the login/signup functionality for hospital admins which was recently implemented. Use the separate Firebase admin configuration. Ensure that the dashboard navigation for admins works correctly after login.",
+    "serverMode": "development",
     "envs": {
       "API_KEY": "sk-user-0lK_fpnxs91WGw8Nvy2heaM5Wb0reRShaAYVA0QmEZlq8aPH_DJAknYYNjvFxkAYgDG-18soOXePKzqHynInCLID9_Et6sPhMfyLGN81e3kBjarxcD0mz5RTE0mkl66RRFc"
     }
   },
-  "serverPort": 60851,
-  "proxy": "http://7c008b2e-e9d0-4531-84ef-40be3eb1d1c4:LW38vjxNUzJXvSchHb0O371SzLl4I8J0@tun.testsprite.com:8080"
+  "serverPort": 56740,
+  "proxy": "http://92793c18-8184-4f37-af01-c0c811acda70:p16ZIlzDREB762Chn96cRhFNfcrZqpmK@tun.testsprite.com:8080"
 }

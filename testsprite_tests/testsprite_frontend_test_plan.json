@@ -1,76 +1,675 @@
 [
-    {
-        "id": "TC001",
-        "title": "Landing Page - Navigation Header Links",
-        "description": "Verify all header navigation links work correctly",
-        "priority": "high",
-        "steps": [
-            "Navigate to /",
-            "Click 'MedQueue' link in header",
-            "Verify redirected to /auth",
-            "Go back to /",
-            "Click 'EduMatch' link in header",
-            "Verify redirected to /auth"
-        ]
-    },
-    {
-        "id": "TC002",
-        "title": "Landing Page - Product Card Buttons",
-        "description": "Verify Launch Platform and Start Counseling buttons navigate to auth",
-        "priority": "high",
-        "steps": [
-            "Navigate to /",
-            "Click 'Launch Platform' button on MedQueue card",
-            "Verify redirected to /auth"
-        ]
-    },
-    {
-        "id": "TC003",
-        "title": "Auth Page - Portal Selection",
-        "description": "Verify all portal selection buttons work",
-        "priority": "high",
-        "steps": [
-            "Navigate to /auth",
-            "Click 'Patient Portal' button",
-            "Verify portal selection form appears",
-            "Click 'Back to selection' button",
-            "Verify returned to portal selection"
-        ]
-    },
-    {
-        "id": "TC004",
-        "title": "MedQueue Admin - Logo Navigation",
-        "description": "Verify logo navigates back to landing page",
-        "priority": "medium",
-        "steps": [
-            "Navigate to /medqueue",
-            "Click on the MedQueue logo",
-            "Verify redirected to /"
-        ]
-    },
-    {
-        "id": "TC005",
-        "title": "EduMatch - See All Matches Toggle",
-        "description": "Verify see all matches button toggles display",
-        "priority": "high",
-        "steps": [
-            "Navigate to /edumatch",
-            "Wait for career matches to load",
-            "Click See all matches button",
-            "Verify button text changes to Show top 3"
-        ]
-    },
-    {
-        "id": "TC006",
-        "title": "Hospital Finder - Filter Modal",
-        "description": "Verify filter button opens and closes modal",
-        "priority": "high",
-        "steps": [
-            "Navigate to /find-hospital",
-            "Click filter button",
-            "Verify filter modal appears",
-            "Click X button to close modal",
-            "Verify modal closes"
-        ]
-    }
+  {
+    "id": "TC001",
+    "title": "Emergency SOS dispatch success path shows dispatched status, ETA, and confirmation",
+    "description": "Verifies that triggering Emergency Help results in a visible dispatched state with ETA and a confirmation message.",
+    "category": "Emergency SOS",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Emergency Help\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Emergency Help\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Ambulance\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Dispatched\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"ETA\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Confirmation\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Emergency SOS allows canceling an active alert and shows canceled confirmation",
+    "description": "Verifies that an in-progress SOS alert can be canceled and the UI confirms cancellation.",
+    "category": "Emergency SOS",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Emergency Help\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Dispatched\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Cancel Alert\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Alert canceled\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Emergency Help\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Emergency SOS prevents duplicate dispatch by disabling or changing the Emergency Help control after activation",
+    "description": "Verifies that after initiating SOS, the UI prevents starting another alert immediately (e.g., button disabled or state changes).",
+    "category": "Emergency SOS",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Emergency Help\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Dispatched\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Cancel Alert\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Emergency Help\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Emergency SOS shows ETA in a readable format once dispatch occurs",
+    "description": "Verifies that the dispatched state includes an ETA value presented on the page.",
+    "category": "Emergency SOS",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Emergency Help\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"ETA\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"min\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Patient can log in from patient auth page and land on Patient page",
+    "description": "Verifies a patient can authenticate using email/password and reach the /patient page.",
+    "category": "Token Booking",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /auth/patient"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/patient\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Search\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Hospital search returns and allows selecting 'General Hospital - Main'",
+    "description": "Verifies searching for a hospital and selecting the intended hospital board works.",
+    "category": "Token Booking",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /auth/patient"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/patient\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"General Hospital\" into the hospital search field"
+      },
+      {
+        "type": "action",
+        "description": "Click on hospital board \"General Hospital - Main\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Cardiology\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Successful token booking for Cardiology at General Hospital shows confirmation and token number",
+    "description": "Verifies end-to-end booking from hospital selection through booking confirmation including token number visibility.",
+    "category": "Token Booking",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /auth/patient"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/patient\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"General Hospital\" into the hospital search field"
+      },
+      {
+        "type": "action",
+        "description": "Click on hospital board \"General Hospital - Main\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Cardiology\" department option"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Continue\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/book\""
+      },
+      {
+        "type": "action",
+        "description": "Fill \"Patient Name\" with \"Test Patient\""
+      },
+      {
+        "type": "action",
+        "description": "Fill \"Age\" with \"35\""
+      },
+      {
+        "type": "action",
+        "description": "Fill \"Phone\" with \"5551234567\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Book Token\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Booking confirmed\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Token\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Booking with missing required patient details shows validation errors",
+    "description": "Verifies the booking form blocks submission and displays a visible validation message when required fields are missing.",
+    "category": "Token Booking",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /auth/patient"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/patient\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"Small Clinic\" into the hospital search field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first visible hospital board result"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first visible doctor department option"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Continue\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/book\""
+      },
+      {
+        "type": "action",
+        "description": "Fill \"Patient Name\" with \"\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Book Token\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"required\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Out-of-availability message shown when attempting to book with no slots available",
+    "description": "Verifies the UI communicates no availability and provides a visible suggestion (waitlist/another slot) when booking cannot be made.",
+    "category": "Token Booking",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /auth/patient"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/patient\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"X\" into the hospital search field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first visible hospital board result"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first visible doctor department option"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Continue\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/book\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Book Token\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"not available\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"waitlist\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Changing hospital search query updates results list",
+    "description": "Verifies the hospital search can be refined and results update accordingly without leaving the /patient page.",
+    "category": "Token Booking",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /auth/patient"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/patient\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"General\" into the hospital search field"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"General Hospital\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Fill the hospital search field with \"Small Clinic\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Small Clinic\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Continue is blocked until a doctor department is chosen (prevents accidental navigation)",
+    "description": "Verifies the user cannot proceed to booking without selecting a department, ensuring required selection is enforced.",
+    "category": "Token Booking",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /auth/patient"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/patient\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"General Hospital\" into the hospital search field"
+      },
+      {
+        "type": "action",
+        "description": "Click on hospital board \"General Hospital - Main\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Continue\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/patient\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Choose\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Run AI triage successfully with a typical symptom description",
+    "description": "Verifies that entering symptoms and running the check displays a triage care level and guidance.",
+    "category": "AI Symptom Checker (Neural Triage)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /symptoms"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"AI Neural Triage System\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"I have a fever and sore throat for 2 days\" into the symptoms input field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Run Check\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Recommended\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Guidance\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Run AI triage successfully with urgent symptom keywords",
+    "description": "Verifies the checker returns a recommendation when symptoms suggest urgency.",
+    "category": "AI Symptom Checker (Neural Triage)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /symptoms"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Chest pain and shortness of breath\" into the symptoms input field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Run Check\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Recommended\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"care\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Guidance\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Validation error when running check with empty symptoms",
+    "description": "Verifies the page blocks submission and shows the required validation message when symptoms are empty.",
+    "category": "AI Symptom Checker (Neural Triage)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /symptoms"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Run Check\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Please describe your symptoms\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Recommended\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Whitespace-only symptoms triggers validation error",
+    "description": "Verifies that entering only spaces does not pass validation and shows the required error message.",
+    "category": "AI Symptom Checker (Neural Triage)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /symptoms"
+      },
+      {
+        "type": "action",
+        "description": "Type \"     \" into the symptoms input field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Run Check\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Please describe your symptoms\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Result is shown after waiting for AI response",
+    "description": "Verifies the user can wait for the AI response and eventually sees the triage output.",
+    "category": "AI Symptom Checker (Neural Triage)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /symptoms"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Nausea and vomiting since this morning\" into the symptoms input field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Run Check\" button"
+      },
+      {
+        "type": "action",
+        "description": "Wait for text \"Recommended\" to appear"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Recommended\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Guidance\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "User can edit symptoms and rerun to get updated guidance",
+    "description": "Verifies that after a completed check, the user can change the symptoms and run the check again.",
+    "category": "AI Symptom Checker (Neural Triage)",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /symptoms"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Mild rash on arms\" into the symptoms input field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Run Check\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Recommended\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Rash is spreading and I have a fever\" into the symptoms input field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Run Check\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Guidance\" is visible"
+      }
+    ]
+  }
 ]
