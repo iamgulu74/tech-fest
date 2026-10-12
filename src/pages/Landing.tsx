@@ -33,7 +33,6 @@ const Landing = () => {
     }, [isAmbulanceDispatched, ambulanceETA]);
 
     const [nearbyEmergencyList, setNearbyEmergencyList] = useState<any[]>([]);
-    const [emergencyCity, setEmergencyCity] = useState<'cuttack' | 'bhubaneswar'>('cuttack');
 
     const openEmergencyOverlay = () => {
         setIsEmergencyActive(true);
@@ -41,10 +40,7 @@ const Landing = () => {
         setIsAmbulanceDispatched(false);
     };
 
-    const startEmergencyScan = (overrideCity?: 'cuttack' | 'bhubaneswar') => {
-        const cityToUse = overrideCity || emergencyCity;
-        if (overrideCity) setEmergencyCity(overrideCity);
-
+    const startEmergencyScan = () => {
         setEmergencyStatus('locating');
         
         const locateAndFetch = async (userLat: number, userLng: number) => {
@@ -58,7 +54,7 @@ const Landing = () => {
                         const dist = (hLat && hLng) ? getDistance(userLat, userLng, hLat, hLng) : (h.distance || 5);
                         return {
                             ...h,
-                            phone: h.phone || (h.id.includes('scb') ? '+91 671 2414004' : h.id.includes('padmini') ? '+91 671 2856200' : '+91 671 2304950'),
+                            phone: h.phone || (h.id.includes('padmini') ? '+91 97760 00399' : h.id.includes('scb') ? '+91 671 2414004' : '+91 671 2304950'),
                             distance: dist
                         };
                     }).sort((a: any, b: any) => a.distance - b.distance);
@@ -71,16 +67,31 @@ const Landing = () => {
                 }, 800);
             } catch (e) {
                 console.error("Emergency Fetch Failed", e);
-                setNearestHospital({ name: "SCB Medical College & Hospital", phone: "+91 671 2414004", distance: 0.5 });
+                setNearestHospital({ name: "Padmini Care Hospital", phone: "+91 97760 00399", distance: 0.1 });
                 setEmergencyStatus('confirmed');
             }
         };
 
-        // When user is in Cuttack (or selected Cuttack), use Cuttack coordinates:
-        if (cityToUse === 'cuttack') {
-            locateAndFetch(20.4625, 85.8830);
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    // If desktop ISP reports Bhubaneswar (20.20 - 20.35) while user is in Tangi, use Tangi GPS (20.5528, 86.0003)
+                    if (lat >= 20.20 && lat <= 20.35) {
+                        locateAndFetch(20.5528, 86.0003);
+                    } else {
+                        locateAndFetch(lat, lng);
+                    }
+                },
+                () => {
+                    // Fallback to real user location in Tangi (DRIEMS campus)
+                    locateAndFetch(20.5528, 86.0003);
+                },
+                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            );
         } else {
-            locateAndFetch(20.2608, 85.7836);
+            locateAndFetch(20.5528, 86.0003);
         }
     };
 
@@ -323,29 +334,6 @@ const Landing = () => {
 
                                 {emergencyStatus === 'confirmed' && nearestHospital && (
                                     <div className="bg-red-50/50 dark:bg-red-950/40 border border-red-100 dark:border-red-900/40 p-6 rounded-3xl mb-8">
-                                        <div className="flex items-center justify-between mb-3 pb-2 border-b border-red-100/50 dark:border-red-900/30">
-                                            <div className="flex items-center gap-1.5">
-                                                <MapPin size={12} className="text-red-500" />
-                                                <span className="text-[10px] font-black uppercase text-slate-700 dark:text-slate-300">
-                                                    Location: {emergencyCity === 'cuttack' ? 'Cuttack' : 'Bhubaneswar'}
-                                                </span>
-                                            </div>
-                                            <div className="flex gap-1">
-                                                <button
-                                                    onClick={() => startEmergencyScan('cuttack')}
-                                                    className={`px-2 py-0.5 rounded text-[9px] font-black uppercase transition-all ${emergencyCity === 'cuttack' ? 'bg-red-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600'}`}
-                                                >
-                                                    Cuttack
-                                                </button>
-                                                <button
-                                                    onClick={() => startEmergencyScan('bhubaneswar')}
-                                                    className={`px-2 py-0.5 rounded text-[9px] font-black uppercase transition-all ${emergencyCity === 'bhubaneswar' ? 'bg-red-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600'}`}
-                                                >
-                                                    Bhubaneswar
-                                                </button>
-                                            </div>
-                                        </div>
-
                                         <div className="flex items-center justify-between mb-2">
                                             <p className="text-[10px] font-black tracking-widest text-red-500 uppercase">Primary Trauma Center</p>
                                             <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/20 uppercase">Nearest</span>

@@ -43,20 +43,7 @@ const MedQueuePatient = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const cityCoordinates: Record<string, { lat: number; lng: number; label: string }> = {
-        cuttack: { lat: 20.4625, lng: 85.8830, label: 'Cuttack (SCB / CDA)' },
-        tangi: { lat: 20.5985, lng: 85.9723, label: 'Tangi, Cuttack (Padmini Care)' },
-        bhubaneswar: { lat: 20.2608, lng: 85.7836, label: 'Bhubaneswar' }
-    };
-
-    const [selectedCity, setSelectedCity] = useState<'cuttack' | 'tangi' | 'bhubaneswar'>(() => {
-        return (localStorage.getItem('medQueueSelectedCity') as any) || 'cuttack';
-    });
-
-    const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(() => {
-        const saved = (localStorage.getItem('medQueueSelectedCity') as any) || 'cuttack';
-        return cityCoordinates[saved] || cityCoordinates.cuttack;
-    });
+    const [userLocation, setUserLocation] = useState<{lat: number, lng: number}>({ lat: 20.5528, lng: 86.0003 });
     const [activeTab, setActiveTab] = useState<'hospitals' | 'symptom-checker' | 'pharmacy'>('hospitals');
     const [cart, setCart] = useState<{ med: Medicine, quantity: number }[]>([]);
     const [medicineSearch, setMedicineSearch] = useState('');
@@ -150,25 +137,35 @@ const MedQueuePatient = () => {
         localStorage.removeItem('medQueueHistory');
         setBookingHistory([]);
 
-        // Default strictly to Cuttack so SCB and Padmini Care are always nearest
-        const initialCoords = cityCoordinates[selectedCity] || cityCoordinates.cuttack;
-        setUserLocation(initialCoords);
+        // Fetch real GPS location
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    // If desktop ISP reports Bhubaneswar (20.20 - 20.35) while user is in Tangi, use Tangi GPS (20.5528, 86.0003)
+                    if (lat >= 20.20 && lat <= 20.35) {
+                        setUserLocation({ lat: 20.5528, lng: 86.0003 });
+                    } else {
+                        setUserLocation({ lat, lng });
+                    }
+                },
+                (err) => {
+                    console.warn("GPS timeout or permission fallback to Tangi:", err);
+                    setUserLocation({ lat: 20.5528, lng: 86.0003 });
+                },
+                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            );
+        } else {
+            setUserLocation({ lat: 20.5528, lng: 86.0003 });
+        }
     }, []);
-
-    const handleCityChange = (city: 'cuttack' | 'tangi' | 'bhubaneswar') => {
-        setSelectedCity(city);
-        localStorage.setItem('medQueueSelectedCity', city);
-        const coords = cityCoordinates[city];
-        setUserLocation(coords);
-        setToast(`Location set to ${coords.label}. Recalculating distances.`);
-        setTimeout(() => setToast(null), 3000);
-    };
 
     useEffect(() => {
         const loadHospitals = async () => {
             try {
                 setLoading(true);
-                const currentCoords = userLocation || cityCoordinates[selectedCity] || cityCoordinates.cuttack;
+                const currentCoords = userLocation || { lat: 20.5528, lng: 86.0003 };
                 const data = await fetchHospitals(currentCoords.lat, currentCoords.lng);
                 setHospitals(data || []);
             } catch (error: any) {
@@ -183,7 +180,7 @@ const MedQueuePatient = () => {
     }, [userLocation]);
 
     const filteredHospitals = useMemo(() => {
-        const currentLoc = userLocation || cityCoordinates[selectedCity] || cityCoordinates.cuttack;
+        const currentLoc = userLocation || { lat: 20.5528, lng: 86.0003 };
         return hospitals.map((h) => {
             const hLat = h.position?.lat || h.location?.lat;
             const hLng = h.position?.lng || h.location?.lng;
@@ -779,44 +776,6 @@ const MedQueuePatient = () => {
 
                 {activeTab === 'hospitals' && (
                     <>
-                        {/* Active Location Switcher */}
-                        <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm mb-6">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-primary/10 rounded-xl text-primary border border-primary/20">
-                                    <MapPin size={20} />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">Active Location:</span>
-                                        <span className="text-xs font-bold text-primary font-mono bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
-                                            {cityCoordinates[selectedCity]?.label || 'Cuttack'}
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-500 font-medium">Prioritizing closest medical facilities with real-time distance sorting</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <button
-                                    onClick={() => handleCityChange('cuttack')}
-                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedCity === 'cuttack' ? 'bg-primary text-white shadow-md shadow-primary/25' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                                >
-                                    📍 Cuttack (SCB)
-                                </button>
-                                <button
-                                    onClick={() => handleCityChange('tangi')}
-                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedCity === 'tangi' ? 'bg-primary text-white shadow-md shadow-primary/25' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                                >
-                                    📍 Tangi (Padmini Care)
-                                </button>
-                                <button
-                                    onClick={() => handleCityChange('bhubaneswar')}
-                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedCity === 'bhubaneswar' ? 'bg-primary text-white shadow-md shadow-primary/25' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                                >
-                                    📍 Bhubaneswar
-                                </button>
-                            </div>
-                        </div>
-
                         {/* Categories */}
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-12">
                             {[
@@ -831,8 +790,6 @@ const MedQueuePatient = () => {
                                     onClick={() => {
                                         if (cat.label === 'Nearby') {
                                             setActiveCategory(activeCategory === 'Nearby' ? null : 'Nearby');
-                                            setToast(`Filtered by proximity to ${cityCoordinates[selectedCity]?.label || 'Cuttack'}.`);
-                                            setTimeout(() => setToast(null), 3000);
                                         } else {
                                             setActiveCategory(cat.label === 'All' ? null : (activeCategory === cat.label ? null : cat.label));
                                         }
@@ -927,7 +884,10 @@ const MedQueuePatient = () => {
                                         Book Token
                                     </PixelButton>
                                     <PixelButton
-                                        onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${hospital.position.lat},${hospital.position.lng}`, '_blank')}
+                                        onClick={() => {
+                                            const destinationQuery = encodeURIComponent(`${hospital.name}, ${hospital.address}`);
+                                            window.open(`https://www.google.com/maps/dir/?api=1&destination=${destinationQuery}`, '_blank');
+                                        }}
                                         color="neutral"
                                         className="w-full"
                                     >

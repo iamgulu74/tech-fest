@@ -325,7 +325,7 @@ const HospitalFinder = () => {
                                         Reserve Protocol
                                     </button>
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); window.open(`https://www.google.com/maps/dir/?api=1&destination=${h.position.lat},${h.position.lng}`, '_blank'); }}
+                                        onClick={(e) => { e.stopPropagation(); window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${h.name}, ${h.address}`)}`, '_blank'); }}
                                         className="flex-1 p-3 bg-slate-100 border border-slate-200 text-slate-600 rounded-2xl hover:bg-slate-200 hover:text-slate-900 transition-all flex flex-col justify-center items-center shadow-sm"
                                         title="Get Directions"
                                     >
