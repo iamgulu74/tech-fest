@@ -1,6 +1,6 @@
 # MedQueue & EduMatch AI — Intelligent Healthcare & Learning Infrastructure
 
-[![GitHub](https://img.shields.io/badge/GitHub-iamgulu74-blue?style=for-the-badge&logo=github)](https://github.com/iamgulu74/trithon)
+[![GitHub](https://img.shields.io/badge/GitHub-iamgulu74-blue?style=for-the-badge&logo=github)](https://github.com/iamgulu74/tech-fest)
 [![React](https://img.shields.io/badge/React-18.x-61dafb?style=for-the-badge&logo=react)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-Express-339933?style=for-the-badge&logo=nodedotjs)](https://nodejs.org/)
@@ -15,7 +15,7 @@ A modern, full-stack predictive healthcare queue management, hospital bed availa
 **MedQueue** solves hospital overcrowding, long patient wait times, and emergency navigation delays by bridging real-time hospital infrastructure data with patient-facing mobile portals.
 
 - **Author & Maintainer**: [iamgulu74](https://github.com/iamgulu74)
-- **Repository**: [https://github.com/iamgulu74/trithon](https://github.com/iamgulu74/trithon)
+- **Repository**: [https://github.com/iamgulu74/tech-fest](https://github.com/iamgulu74/tech-fest)
 
 ---
 
@@ -123,8 +123,8 @@ A modern, full-stack predictive healthcare queue management, hospital bed availa
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/iamgulu74/trithon.git
-cd trithon
+git clone https://github.com/iamgulu74/tech-fest.git
+cd tech-fest
 ```
 
 ### 2. Configure Environment Variables
@@ -182,7 +182,7 @@ npm run build
 
 - **Developer**: **iamgulu74**
 - **GitHub**: [@iamgulu74](https://github.com/iamgulu74)
-- **Repository**: [iamgulu74/trithon](https://github.com/iamgulu74/trithon)
+- **Repository**: [iamgulu74/tech-fest](https://github.com/iamgulu74/tech-fest)
 
 ---
 
