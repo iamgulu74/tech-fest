@@ -43,7 +43,7 @@ const MedQueuePatient = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const [userLocation, setUserLocation] = useState<{lat: number, lng: number}>({ lat: 20.5585586, lng: 85.9995065 });
+    const [userLocation, setUserLocation] = useState<{lat: number, lng: number}>({ lat: 20.550833, lng: 85.998361 });
     const [activeTab, setActiveTab] = useState<'hospitals' | 'symptom-checker' | 'pharmacy'>('hospitals');
     const [cart, setCart] = useState<{ med: Medicine, quantity: number }[]>([]);
     const [medicineSearch, setMedicineSearch] = useState('');
@@ -53,7 +53,13 @@ const MedQueuePatient = () => {
     const [showPaymentGateway, setShowPaymentGateway] = useState(false);
     const [paymentAmount, setPaymentAmount] = useState(0);
     const [showHistory, setShowHistory] = useState(false);
-    const [bookingHistory, setBookingHistory] = useState<any[]>([]);
+    const [bookingHistory, setBookingHistory] = useState<any[]>(() => {
+        try {
+            return JSON.parse(localStorage.getItem('medQueueHistory') || '[]');
+        } catch (e) {
+            return [];
+        }
+    });
     const [toast, setToast] = useState<string | null>(null);
     const [notifications, setNotifications] = useState<any[]>([
         { id: 1, title: 'Welcome to MedQueue', message: 'You can now book tokens at 100+ hospitals.', time: '2m ago', read: false, type: 'info' },
@@ -156,9 +162,19 @@ const MedQueuePatient = () => {
     };
 
     useEffect(() => {
-        // Clear all mock booking history as requested
-        localStorage.removeItem('medQueueHistory');
-        setBookingHistory([]);
+        // Load real booking history from localStorage
+        const loadHistory = () => {
+            try {
+                const saved = JSON.parse(localStorage.getItem('medQueueHistory') || '[]');
+                setBookingHistory(saved);
+            } catch (e) {
+                setBookingHistory([]);
+            }
+        };
+
+        loadHistory();
+        window.addEventListener('storage', loadHistory);
+        window.addEventListener('focus', loadHistory);
 
         // Fetch real device GPS location
         if ("geolocation" in navigator) {
@@ -170,7 +186,8 @@ const MedQueuePatient = () => {
                     setIsLiveGps(true);
                 },
                 (err) => {
-                    console.warn("GPS error fallback:", err);
+                    console.warn("GPS error fallback to live location:", err);
+                    setUserLocation({ lat: 20.550833, lng: 85.998361 });
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
@@ -191,15 +208,22 @@ const MedQueuePatient = () => {
 
             return () => {
                 navigator.geolocation.clearWatch(watchId);
+                window.removeEventListener('storage', loadHistory);
+                window.removeEventListener('focus', loadHistory);
             };
         }
+
+        return () => {
+            window.removeEventListener('storage', loadHistory);
+            window.removeEventListener('focus', loadHistory);
+        };
     }, []);
 
     useEffect(() => {
         const loadHospitals = async () => {
             try {
                 setLoading(true);
-                const currentCoords = userLocation || { lat: 20.5585586, lng: 85.9995065 };
+                const currentCoords = userLocation || { lat: 20.550833, lng: 85.998361 };
                 const data = await fetchHospitals(currentCoords.lat, currentCoords.lng);
                 setHospitals(data || []);
             } catch (error: any) {
@@ -214,7 +238,7 @@ const MedQueuePatient = () => {
     }, [userLocation]);
 
     const filteredHospitals = useMemo(() => {
-        const currentLoc = userLocation || { lat: 20.5585586, lng: 85.9995065 };
+        const currentLoc = userLocation || { lat: 20.550833, lng: 85.998361 };
         
         // Deduplicate any repeated hospital names
         const seenNames = new Set<string>();
@@ -606,12 +630,21 @@ const MedQueuePatient = () => {
                         </button>
 
                         <button
-                            onClick={() => setShowHistory(true)}
-                            className="p-2 text-gray-400 hover:text-slate-900 transition-colors relative group"
+                            onClick={() => {
+                                try {
+                                    const saved = JSON.parse(localStorage.getItem('medQueueHistory') || '[]');
+                                    setBookingHistory(saved);
+                                } catch (e) {}
+                                setShowHistory(true);
+                            }}
+                            className="p-2 text-gray-400 hover:text-slate-900 dark:hover:text-white transition-colors relative group"
                             title="My Bookings"
                         >
                             <FileText size={20} />
-                            <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-white text-black text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">History</span>
+                            {bookingHistory.length > 0 && (
+                                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full ring-2 ring-white dark:ring-slate-900" />
+                            )}
+                            <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-800 text-black dark:text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-md">History ({bookingHistory.length})</span>
                         </button>
 
                         <div className="relative">

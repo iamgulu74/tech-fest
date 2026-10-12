@@ -92,12 +92,12 @@ const Landing = () => {
                 },
                 () => {
                     // Fallback if GPS access is denied
-                    locateAndFetch(20.5585586, 85.9995065);
+                    locateAndFetch(20.550833, 85.998361);
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         } else {
-            locateAndFetch(20.5585586, 85.9995065);
+            locateAndFetch(20.550833, 85.998361);
         }
     };
 
