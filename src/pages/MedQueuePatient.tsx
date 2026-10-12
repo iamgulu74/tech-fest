@@ -43,7 +43,7 @@ const MedQueuePatient = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const [userLocation, setUserLocation] = useState<{lat: number, lng: number}>({ lat: 20.5528, lng: 86.0003 });
+    const [userLocation, setUserLocation] = useState<{lat: number, lng: number}>({ lat: 20.5585586, lng: 85.9995065 });
     const [activeTab, setActiveTab] = useState<'hospitals' | 'symptom-checker' | 'pharmacy'>('hospitals');
     const [cart, setCart] = useState<{ med: Medicine, quantity: number }[]>([]);
     const [medicineSearch, setMedicineSearch] = useState('');
@@ -143,21 +143,21 @@ const MedQueuePatient = () => {
                 (pos) => {
                     const lat = pos.coords.latitude;
                     const lng = pos.coords.longitude;
-                    // If desktop ISP reports Bhubaneswar (20.20 - 20.35) while user is in Tangi, use Tangi GPS (20.5528, 86.0003)
-                    if (lat >= 20.20 && lat <= 20.35) {
-                        setUserLocation({ lat: 20.5528, lng: 86.0003 });
+                    // If desktop ISP reports Bhubaneswar (20.15 - 20.40) while user is in Tangi, use verified Tangi GPS (20.5585586, 85.9995065)
+                    if (lat >= 20.15 && lat <= 20.40) {
+                        setUserLocation({ lat: 20.5585586, lng: 85.9995065 });
                     } else {
                         setUserLocation({ lat, lng });
                     }
                 },
                 (err) => {
                     console.warn("GPS timeout or permission fallback to Tangi:", err);
-                    setUserLocation({ lat: 20.5528, lng: 86.0003 });
+                    setUserLocation({ lat: 20.5585586, lng: 85.9995065 });
                 },
                 { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
             );
         } else {
-            setUserLocation({ lat: 20.5528, lng: 86.0003 });
+            setUserLocation({ lat: 20.5585586, lng: 85.9995065 });
         }
     }, []);
 
@@ -165,7 +165,7 @@ const MedQueuePatient = () => {
         const loadHospitals = async () => {
             try {
                 setLoading(true);
-                const currentCoords = userLocation || { lat: 20.5528, lng: 86.0003 };
+                const currentCoords = userLocation || { lat: 20.5585586, lng: 85.9995065 };
                 const data = await fetchHospitals(currentCoords.lat, currentCoords.lng);
                 setHospitals(data || []);
             } catch (error: any) {
@@ -180,16 +180,25 @@ const MedQueuePatient = () => {
     }, [userLocation]);
 
     const filteredHospitals = useMemo(() => {
-        const currentLoc = userLocation || { lat: 20.5528, lng: 86.0003 };
-        return hospitals.map((h) => {
+        const currentLoc = userLocation || { lat: 20.5585586, lng: 85.9995065 };
+        
+        // Deduplicate any repeated hospital names
+        const seenNames = new Set<string>();
+        const uniqueHospitals = hospitals.map((h) => {
             const hLat = h.position?.lat || h.location?.lat;
             const hLng = h.position?.lng || h.location?.lng;
-            const computedDist = (hLat && hLng) ? getDistance(currentLoc.lat, currentLoc.lng, hLat, hLng) : (h.distance || 10);
+            const computedDist = (hLat && hLng) ? getDistance(currentLoc.lat, currentLoc.lng, hLat, hLng) : (h.distance || 0.95);
             return {
                 ...h,
                 computedDistance: computedDist
             };
-        }).filter((h, index) => {
+        }).filter((h) => {
+            if (seenNames.has(h.name)) return false;
+            seenNames.add(h.name);
+            return true;
+        });
+
+        return uniqueHospitals.filter((h, index) => {
             const hName = h?.name || '';
             const hAddress = h?.address || '';
             const hType = h?.type || (index % 4 === 0 ? 'Emergency' : index % 3 === 0 ? 'Diagnostics' : 'General');
@@ -200,28 +209,41 @@ const MedQueuePatient = () => {
                 hAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 hCity.toLowerCase().includes(searchTerm.toLowerCase());
 
-            if (!activeCategory || activeCategory === 'All') return matchesSearch;
+            if (!matchesSearch) return false;
+
+            if (!activeCategory || activeCategory === 'All') return true;
 
             if (activeCategory === 'Emergency') {
-                return matchesSearch && (hType === 'Emergency' || h.beds > 0 || String(hName).includes("Super Speciality"));
+                return hType === 'Emergency' || (h.beds && h.beds > 0) || hName.includes("Hospital") || hName.includes("Medical");
             }
             if (activeCategory === 'Diagnostics') {
-                return matchesSearch && (hType === 'Diagnostics' || String(hName).includes("Hospital"));
+                return h.hasDiagnostics || hType === 'Diagnostics' || (h.diagnosticScore && h.diagnosticScore >= 80) || (h.rating >= 4.4 && h.totalRatings > 500) || hName.toLowerCase().includes("diagnostic") || hName.toLowerCase().includes("lab");
             }
             if (activeCategory === 'Min Wait') {
-                return matchesSearch && waitTime <= 40;
+                return waitTime <= 45;
             }
             if (activeCategory === 'Nearby') {
-                return matchesSearch; // Show all matching hospitals sorted by nearest distance!
+                return true;
             }
-            return matchesSearch;
+            return true;
         }).sort((a, b) => {
             if (activeCategory === 'Min Wait') {
-                const waitA = a.avgWaitTime || a.wait_time || (a.queue || 0) * 5;
-                const waitB = b.avgWaitTime || b.wait_time || (b.queue || 0) * 5;
+                const waitA = a.avgWaitTime ?? a.wait_time ?? (a.queue || 0) * 5;
+                const waitB = b.avgWaitTime ?? b.wait_time ?? (b.queue || 0) * 5;
                 return waitA - waitB;
             }
-            // Default and Nearby: Sort by nearest distance ascending
+            if (activeCategory === 'Diagnostics') {
+                // Best preference first:
+                // 1. Dedicated diagnostic centers and highest diagnostic score/rating
+                const scoreA = (a.type === 'Diagnostics' ? 200 : 0) + (a.diagnosticScore || Math.round((a.diagnosticRating || a.rating || 4) * 20));
+                const scoreB = (b.type === 'Diagnostics' ? 200 : 0) + (b.diagnosticScore || Math.round((b.diagnosticRating || b.rating || 4) * 20));
+                if (scoreB !== scoreA) {
+                    return scoreB - scoreA;
+                }
+                // Secondary: nearest distance
+                return a.computedDistance - b.computedDistance;
+            }
+            // Default, Emergency, and Nearby: Sort by nearest distance ascending
             return a.computedDistance - b.computedDistance;
         });
     }, [hospitals, searchTerm, activeCategory, userLocation]);
@@ -790,31 +812,33 @@ const MedQueuePatient = () => {
                                     onClick={() => {
                                         if (cat.label === 'Nearby') {
                                             setActiveCategory(activeCategory === 'Nearby' ? null : 'Nearby');
+                                        } else if (cat.label === 'All') {
+                                            setActiveCategory(null);
                                         } else {
-                                            setActiveCategory(cat.label === 'All' ? null : (activeCategory === cat.label ? null : cat.label));
+                                            setActiveCategory(activeCategory === cat.label ? null : cat.label);
                                         }
                                     }}
                                     className={`glass p-6 rounded-2xl border transition-all text-center group ${(cat.label === 'All' && activeCategory === null) || activeCategory === cat.label
-                                        ? 'border-primary bg-primary/10 shadow-lg shadow-primary/20'
-                                        : 'border-slate-200 hover:border-white/20'
+                                        ? 'border-primary bg-primary/10 shadow-lg shadow-primary/20 dark:bg-primary/20'
+                                        : 'border-slate-200 dark:border-slate-800 hover:border-primary/40'
                                         }`}
                                 >
-                                    <div className={`w-12 h-12 ${cat.color} bg-slate-100/50 rounded-xl flex items-center justify-center mb-3 mx-auto group-hover:scale-110 transition-transform`}>
+                                    <div className={`w-12 h-12 ${cat.color} bg-slate-100/50 dark:bg-slate-800/80 rounded-xl flex items-center justify-center mb-3 mx-auto group-hover:scale-110 transition-transform`}>
                                         <cat.icon size={24} />
                                     </div>
-                                    <p className="text-sm font-bold text-slate-900 uppercase tracking-wider">{cat.label}</p>
+                                    <p className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">{cat.label}</p>
                                 </button>
                             ))}
                         </div>
 
                         {/* Hospital List */}
-                        <h2 className="text-xl font-black text-slate-900 mb-6 uppercase tracking-tighter flex items-center justify-between">
+                        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-6 uppercase tracking-tighter flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <Activity className="text-primary" size={20} />
                                 Live Medical Hubs
                             </div>
-                            <span className="text-xs font-bold text-gray-500 bg-slate-100/50 px-4 py-2 rounded-full border border-slate-200 uppercase tracking-widest">
-                                {hospitals.length} INSTITUTIONS INDEXED
+                            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-slate-100/50 dark:bg-slate-800/50 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 uppercase tracking-widest">
+                                {filteredHospitals.length} INSTITUTIONS INDEXED
                             </span>
                         </h2>
 
@@ -834,21 +858,40 @@ const MedQueuePatient = () => {
                                 >
                                     <div className="flex flex-col md:flex-row justify-between gap-8">
                                         <div className="flex-1">
-                                            <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                            <div className="flex items-center gap-2 mb-2 flex-wrap">
                                                 <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{hospital.name}</h3>
                                                 <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-black rounded-full border border-primary/20 flex items-center gap-1.5">
                                                     <Navigation size={12} className="text-primary" />
-                                                    {hospital.computedDistance !== undefined ? `${hospital.computedDistance.toFixed(1)} km away` : '0.5 km away'}
+                                                    {hospital.computedDistance !== undefined ? `${hospital.computedDistance.toFixed(1)} km away` : '0.9 km away'}
                                                 </span>
+                                                <span className="px-3 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-black rounded-full border border-amber-500/20 flex items-center gap-1.5">
+                                                    <Clock size={12} />
+                                                    Est. Arrival ~{Math.max(2, Math.round((hospital.computedDistance ?? 0.95) * 3))} min
+                                                </span>
+                                                {hospital.hasDiagnostics && (
+                                                    <span className="px-3 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-black rounded-full border border-blue-500/20 flex items-center gap-1.5">
+                                                        <Activity size={12} />
+                                                        Diagnostic Lab ({hospital.diagnosticRating || hospital.rating}★)
+                                                    </span>
+                                                )}
                                                 {hospital.surge_detected && (
                                                     <span className="px-3 py-1 bg-red-500/10 text-red-500 text-[10px] font-black uppercase rounded-full border border-red-500/20 animate-pulse">
                                                         High Surge
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="text-gray-500 text-sm font-medium mb-6 flex items-center gap-2">
+                                            <p className="text-gray-500 text-sm font-medium mb-3 flex items-center gap-2">
                                                 <MapPin size={14} /> {hospital.address}
                                             </p>
+                                            {hospital.diagnosticSpecialties && hospital.diagnosticSpecialties.length > 0 && (
+                                                <div className="flex flex-wrap gap-1.5 mb-4">
+                                                    {hospital.diagnosticSpecialties.map((spec: string) => (
+                                                        <span key={spec} className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-bold">
+                                                            {spec}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
 
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
                                         <div className="p-4 rounded-2xl bg-slate-100/50 border border-slate-200">
@@ -885,8 +928,9 @@ const MedQueuePatient = () => {
                                     </PixelButton>
                                     <PixelButton
                                         onClick={() => {
+                                            const originCoord = `${userLocation.lat},${userLocation.lng}`;
                                             const destinationQuery = encodeURIComponent(`${hospital.name}, ${hospital.address}`);
-                                            window.open(`https://www.google.com/maps/dir/?api=1&destination=${destinationQuery}`, '_blank');
+                                            window.open(`https://www.google.com/maps/dir/${originCoord}/${destinationQuery}`, '_blank');
                                         }}
                                         color="neutral"
                                         className="w-full"

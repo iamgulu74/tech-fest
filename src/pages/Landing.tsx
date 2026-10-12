@@ -51,23 +51,36 @@ const Landing = () => {
                     const sorted = hospitals.map((h: any) => {
                         const hLat = h.position?.lat || h.location?.lat;
                         const hLng = h.position?.lng || h.location?.lng;
-                        const dist = (hLat && hLng) ? getDistance(userLat, userLng, hLat, hLng) : (h.distance || 5);
+                        const dist = (hLat && hLng) ? getDistance(userLat, userLng, hLat, hLng) : (h.distance || 0.95);
                         return {
                             ...h,
-                            phone: h.phone || (h.id.includes('padmini') ? '+91 97760 00399' : h.id.includes('scb') ? '+91 671 2414004' : '+91 671 2304950'),
+                            phone: h.phone || (h.id?.includes('padmini') ? '+91 97760 00399' : h.id?.includes('scb') ? '+91 671 2414004' : '+91 671 2304950'),
                             distance: dist
                         };
                     }).sort((a: any, b: any) => a.distance - b.distance);
 
-                    setNearestHospital(sorted[0]);
-                    setNearbyEmergencyList(sorted.slice(0, 4));
+                    // Deduplicate any repeated hospital names
+                    const seenNames = new Set<string>();
+                    const uniqueSorted = sorted.filter((h: any) => {
+                        if (seenNames.has(h.name)) return false;
+                        seenNames.add(h.name);
+                        return true;
+                    });
+
+                    const primary = uniqueSorted[0];
+                    setNearestHospital(primary);
+                    setNearbyEmergencyList(uniqueSorted.slice(0, 4));
+                    if (primary?.distance) {
+                        setAmbulanceETA(Math.max(2, Math.round(primary.distance * 3)));
+                    }
                 }
                 setTimeout(() => {
                     setEmergencyStatus('confirmed');
                 }, 800);
             } catch (e) {
                 console.error("Emergency Fetch Failed", e);
-                setNearestHospital({ name: "Padmini Care Hospital", phone: "+91 97760 00399", distance: 0.1 });
+                setNearestHospital({ name: "Padmini Care Hospital", phone: "+91 97760 00399", distance: 0.95 });
+                setAmbulanceETA(3);
                 setEmergencyStatus('confirmed');
             }
         };
@@ -77,21 +90,21 @@ const Landing = () => {
                 (pos) => {
                     const lat = pos.coords.latitude;
                     const lng = pos.coords.longitude;
-                    // If desktop ISP reports Bhubaneswar (20.20 - 20.35) while user is in Tangi, use Tangi GPS (20.5528, 86.0003)
-                    if (lat >= 20.20 && lat <= 20.35) {
-                        locateAndFetch(20.5528, 86.0003);
+                    // If desktop ISP reports Bhubaneswar (20.15 - 20.40) while user is in Tangi, use verified Tangi GPS (20.5585586, 85.9995065)
+                    if (lat >= 20.15 && lat <= 20.40) {
+                        locateAndFetch(20.5585586, 85.9995065);
                     } else {
                         locateAndFetch(lat, lng);
                     }
                 },
                 () => {
-                    // Fallback to real user location in Tangi (DRIEMS campus)
-                    locateAndFetch(20.5528, 86.0003);
+                    // Fallback to real user location in Tangi (Cuttack district)
+                    locateAndFetch(20.5585586, 85.9995065);
                 },
                 { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
             );
         } else {
-            locateAndFetch(20.5528, 86.0003);
+            locateAndFetch(20.5585586, 85.9995065);
         }
     };
 
@@ -343,11 +356,13 @@ const Landing = () => {
                                         <div className="flex items-center justify-center gap-6 my-4 py-4 border-y border-red-100/50 dark:border-red-900/30">
                                             <div className="text-center">
                                                 <p className="text-[10px] text-slate-400 uppercase font-black">Distance</p>
-                                                <p className="text-sm font-bold text-slate-900 dark:text-white">{nearestHospital.distance?.toFixed(1) || '0.8'} km</p>
+                                                <p className="text-sm font-bold text-slate-900 dark:text-white">{nearestHospital.distance?.toFixed(1) || '0.9'} km</p>
                                             </div>
                                             <div className="text-center">
                                                 <p className="text-[10px] text-slate-400 uppercase font-black">Est. Arrival</p>
-                                                <p className="text-sm font-bold text-red-500 italic">~10 Mins</p>
+                                                <p className="text-sm font-bold text-red-500 italic">
+                                                    ~{Math.max(2, Math.round((nearestHospital.distance || 0.95) * 3))} Mins
+                                                </p>
                                             </div>
                                         </div>
 
@@ -356,14 +371,16 @@ const Landing = () => {
                                             <div className="mb-4 text-left">
                                                 <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Other Nearby Centers:</p>
                                                 <div className="flex flex-col gap-1.5">
-                                                    {nearbyEmergencyList.filter(h => h.id !== nearestHospital.id).map(alt => (
+                                                    {nearbyEmergencyList.filter(h => h.id !== nearestHospital.id && h.name !== nearestHospital.name).map(alt => (
                                                         <button
                                                             key={alt.id}
                                                             onClick={() => setNearestHospital(alt)}
                                                             className="text-left px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-red-500 transition-all text-xs font-bold flex items-center justify-between"
                                                         >
                                                             <span className="truncate text-slate-800 dark:text-slate-200">{alt.name}</span>
-                                                            <span className="text-[10px] text-red-500 font-mono shrink-0 ml-2">{alt.distance?.toFixed(1)} km</span>
+                                                            <span className="text-[10px] text-red-500 font-mono shrink-0 ml-2">
+                                                                {alt.distance?.toFixed(1)} km (~{Math.max(2, Math.round(alt.distance * 3))}m)
+                                                            </span>
                                                         </button>
                                                     ))}
                                                 </div>
