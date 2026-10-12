@@ -1,27 +1,35 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Landing from './pages/Landing';
-import MedQueueAdmin from './pages/MedQueueAdmin';
-import MedQueuePatient from './pages/MedQueuePatient';
-import PatientDashboard from './pages/PatientDashboard';
-import BookingPage from './pages/BookingPage';
-import Auth from './pages/Auth';
-import AuthPatient from './pages/AuthPatient';
-import AuthAdmin from './pages/AuthAdmin';
-import HospitalFinder from './pages/HospitalFinder';
-import WardsBeds from './pages/WardsBeds';
-import Staffing from './pages/Staffing';
-import Analytics from './pages/Analytics';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import LearnHub from './pages/LearnHub';
-import DiseasesModule from './pages/DiseasesModule';
-import TreatmentsModule from './pages/TreatmentsModule';
-import WellnessModule from './pages/WellnessModule';
-import FirstAidModule from './pages/FirstAidModule';
-import Pricing from './pages/Pricing';
 import SymptomChecker from './components/SymptomChecker';
 import { SubscriptionProvider } from './contexts/SubscriptionContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+
+const MedQueueAdmin = lazy(() => import('./pages/MedQueueAdmin'));
+const MedQueuePatient = lazy(() => import('./pages/MedQueuePatient'));
+const PatientDashboard = lazy(() => import('./pages/PatientDashboard'));
+const BookingPage = lazy(() => import('./pages/BookingPage'));
+const Auth = lazy(() => import('./pages/Auth'));
+const AuthPatient = lazy(() => import('./pages/AuthPatient'));
+const AuthAdmin = lazy(() => import('./pages/AuthAdmin'));
+const HospitalFinder = lazy(() => import('./pages/HospitalFinder'));
+const WardsBeds = lazy(() => import('./pages/WardsBeds'));
+const Staffing = lazy(() => import('./pages/Staffing'));
+const Analytics = lazy(() => import('./pages/Analytics'));
+const LearnHub = lazy(() => import('./pages/LearnHub'));
+const DiseasesModule = lazy(() => import('./pages/DiseasesModule'));
+const TreatmentsModule = lazy(() => import('./pages/TreatmentsModule'));
+const WellnessModule = lazy(() => import('./pages/WellnessModule'));
+const FirstAidModule = lazy(() => import('./pages/FirstAidModule'));
+const Pricing = lazy(() => import('./pages/Pricing'));
+
+const RouteLoader = () => (
+    <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+);
 
 function App() {
     return (
@@ -29,6 +37,7 @@ function App() {
         <LanguageProvider>
         <SubscriptionProvider>
             <Router>
+                <Suspense fallback={<RouteLoader />}>
                 <Routes>
 
                 {/* Public Routes */}
@@ -124,6 +133,7 @@ function App() {
                     }
                 />
             </Routes>
+            </Suspense>
         </Router>
         </SubscriptionProvider>
         </LanguageProvider>

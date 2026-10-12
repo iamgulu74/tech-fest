@@ -33,7 +33,11 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         if (isLoggedIn && user?.email) {
             const savedSubscription = localStorage.getItem(`sub_${user.email}`);
             if (savedSubscription) {
-                setSubscription(JSON.parse(savedSubscription));
+                try {
+                    setSubscription(JSON.parse(savedSubscription));
+                } catch {
+                    localStorage.removeItem(`sub_${user.email}`);
+                }
             } else {
                 // Check if user should have a trial (strategy says everyone starts with 7-day trial after signup)
                 // For now, we'll let them manually start it or auto-start on first premium action

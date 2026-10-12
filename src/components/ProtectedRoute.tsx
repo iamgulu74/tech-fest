@@ -73,7 +73,11 @@ export const useAuth = () => {
     useEffect(() => {
         const authData = localStorage.getItem('authState');
         if (authData) {
-            setAuth(JSON.parse(authData));
+            try {
+                setAuth(JSON.parse(authData));
+            } catch {
+                localStorage.removeItem('authState');
+            }
         }
     }, []);
 

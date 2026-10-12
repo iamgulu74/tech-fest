@@ -1,10 +1,10 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getAnalytics } from "firebase/analytics";
+import { getAnalytics, isSupported } from "firebase/analytics";
 
 const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyB1jdkb86ugo34BGyL-9Y-PtiwAIPFMUyk",
     authDomain: "trithon-e6073.firebaseapp.com",
     projectId: "trithon-e6073",
     storageBucket: "trithon-e6073.firebasestorage.app",
@@ -13,8 +13,26 @@ const firebaseConfig = {
     measurementId: "G-RG6SQYLV4E"
 };
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
+let app: any = null;
+let auth: any = null;
+let db: any = null;
+let analytics: any = null;
+
+try {
+    const existing = getApps().find(a => a.name === "[DEFAULT]");
+    app = existing || initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    if (typeof window !== 'undefined') {
+        isSupported().then(yes => {
+            if (yes) {
+                analytics = getAnalytics(app);
+            }
+        }).catch(() => {});
+    }
+} catch (err) {
+    console.error("Firebase app initialization error:", err);
+}
+
+export { auth, db, analytics };
 export default app;
